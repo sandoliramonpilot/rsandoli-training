@@ -1,0 +1,2835 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Protótipo RSandoli Training API</title>
+  
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/basecoat.cdn.min.css">
+  <style>
+/* Skip artifact shell — fixed styles served beside every artifact.
+   Complements basecoat; artifacts override --accent for their own identity. */
+:root {
+  color-scheme: light dark;
+  --accent: #2563eb;
+  --accent-contrast: #ffffff;
+  --accent-text: color-mix(in srgb, var(--accent) 72%, #000);
+  --bg: #f8f9fb;
+  --surface: #ffffff;
+  --text: #14171f;
+  --text-muted: #5b6472;
+  --border: rgba(20, 23, 31, 0.10);
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(20, 23, 31, 0.08);
+  --space: 16px;
+}
+/* Theme resolution. Without data-theme the viewer's system preference decides,
+   as it always did. With it, the artifact's own choice wins in BOTH directions:
+   a page that hardcodes one palette must not be handed the opposite set of
+   tokens by the machine it happens to be opened on. The dark values appear
+   twice because a media query cannot be folded into a selector list.
+   The attribute sits inside :where() so these blocks keep the specificity of a
+   bare :root — the page's own <style> is linked after this file and must go on
+   overriding any token it wants, exactly as it could before. */
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    --accent-text: color-mix(in srgb, var(--accent) 78%, #fff);
+    --bg: #101318;
+    --surface: #181c23;
+    --text: #eef1f6;
+    --text-muted: #9aa4b2;
+    --border: rgba(238, 241, 246, 0.12);
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+}
+:root:where([data-theme="dark"]) {
+  color-scheme: dark;
+  --accent-text: color-mix(in srgb, var(--accent) 78%, #fff);
+  --bg: #101318;
+  --surface: #181c23;
+  --text: #eef1f6;
+  --text-muted: #9aa4b2;
+  --border: rgba(238, 241, 246, 0.12);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+:root:where([data-theme="light"]) { color-scheme: light; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+img { max-width: 100%; display: block; }
+
+.shell-container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+.shell-section { padding: calc(var(--space) * 2) 0; }
+.shell-grid { display: grid; gap: var(--space); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.shell-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: var(--space); }
+.shell-footer { padding: 24px 0 40px; color: var(--text-muted); font-size: 13px; }
+
+.shell-hero { padding: calc(var(--space) * 3) 0 calc(var(--space) * 2); }
+.shell-hero h1 { font-size: clamp(26px, 4vw, 40px); line-height: 1.15; margin: 0 0 10px; text-wrap: balance; }
+.shell-hero p { color: var(--text-muted); max-width: 60ch; margin: 0; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--space);
+}
+
+.kpi { display: flex; flex-direction: column; gap: 4px; }
+.kpi .kpi-value { font-size: 28px; font-weight: 650; line-height: 1.1; }
+.kpi .kpi-label { font-size: 13px; color: var(--text-muted); }
+.kpi .kpi-delta { font-size: 12.5px; font-weight: 600; }
+.kpi .kpi-delta.up { color: #0a8f3c; }
+.kpi .kpi-delta.down { color: #cf3131; }
+
+table.shell-table { border-collapse: collapse; width: 100%; font-size: 14px; }
+table.shell-table th {
+  text-align: left; font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-muted); font-weight: 600;
+}
+table.shell-table th, table.shell-table td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--border); }
+table.shell-table td.num, table.shell-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.shell-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+
+.chart-box { width: 100%; min-height: 220px; }
+.chart-box svg { width: 100%; height: auto; display: block; }
+
+.muted { color: var(--text-muted); }
+.accent { color: var(--accent-text); }
+.shell-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent-text);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell-fade { animation: shell-fade 400ms ease both; }
+  @keyframes shell-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}
+
+</style>
+  
+
+  <style>
+    :root {
+      --accent: #0284c7;
+      --accent-hover: #0369a1;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Notice Banner */
+    .env-banner {
+      background: #eff6ff;
+      border-bottom: 1px solid #bfdbfe;
+      color: #1e40af;
+      padding: 8px 16px;
+      font-size: 0.8125rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .env-banner strong { font-weight: 600; }
+
+    /* Header & Navigation */
+    .app-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 1.1rem;
+      box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25);
+    }
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--text);
+    }
+    .brand-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+
+    /* Auth & Config Bar */
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .backend-badge-pill {
+      display: flex;
+      align-items: center;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px 10px;
+      gap: 8px;
+      font-size: 0.78rem;
+      font-family: monospace;
+      color: var(--text-muted);
+    }
+    .backend-badge-pill code {
+      color: var(--accent-text);
+      font-weight: 600;
+    }
+    .icon-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+    .icon-btn:hover {
+      color: var(--text);
+      background: rgba(0,0,0,0.05);
+    }
+
+    /* Main Layout */
+    .app-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      flex: 1;
+      min-height: calc(100vh - 105px);
+    }
+
+    @media (max-width: 900px) {
+      .app-layout {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        display: none;
+      }
+      .sidebar.open {
+        display: block;
+        position: fixed;
+        left: 0;
+        top: 55px;
+        bottom: 0;
+        width: 280px;
+        z-index: 50;
+        box-shadow: 2px 0 16px rgba(0,0,0,0.2);
+      }
+    }
+
+    /* Sidebar Navigation */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 16px 12px;
+      overflow-y: auto;
+      max-height: calc(100vh - 105px);
+    }
+    .nav-group {
+      margin-bottom: 20px;
+    }
+    .nav-group-title {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      padding: 6px 12px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      font-size: 0.84rem;
+      color: var(--text);
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+      margin-bottom: 2px;
+    }
+    .nav-item:hover {
+      background: #f1f5f9;
+      color: var(--accent-text);
+    }
+    .nav-item.active {
+      background: #e0f2fe;
+      color: #0369a1;
+      font-weight: 600;
+    }
+    .nav-counter {
+      font-size: 0.72rem;
+      padding: 2px 6px;
+      border-radius: 10px;
+      background: var(--border);
+      color: var(--text-muted);
+    }
+    .nav-item.active .nav-counter {
+      background: #bae6fd;
+      color: #0369a1;
+    }
+
+    /* Main Content Area */
+    .main-content {
+      padding: 24px;
+      overflow-x: hidden;
+      background: var(--bg);
+    }
+
+    /* Header for entity view */
+    .view-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .view-title h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin: 0;
+      color: var(--text);
+    }
+    .view-title p {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      margin: 4px 0 0 0;
+    }
+    .view-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* Filter & Search Toolbar */
+    .table-toolbar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .filter-left, .filter-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .search-input {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 7px 12px;
+      font-size: 0.85rem;
+      min-width: 220px;
+      background: var(--bg);
+    }
+    .filter-select {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 7px 10px;
+      font-size: 0.85rem;
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    /* Data Table styling */
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .table-responsive {
+      overflow-x: auto;
+      max-width: 100%;
+    }
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+      text-align: left;
+    }
+    table.data-table th {
+      background: #f8fafc;
+      padding: 10px 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    table.data-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: middle;
+    }
+    table.data-table tr:hover {
+      background-color: #f8fafc;
+    }
+    table.data-table tr.is-deleted {
+      background-color: #fef2f2;
+      opacity: 0.75;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      font-size: 0.73rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .badge-success { background: #dcfce7; color: #15803d; }
+    .badge-warning { background: #fef3c7; color: #b45309; }
+    .badge-danger { background: #fee2e2; color: #b91c1c; }
+    .badge-info { background: #e0f2fe; color: #0369a1; }
+    .badge-neutral { background: #f1f5f9; color: #475569; }
+
+    /* Pagination Bar */
+    .pagination-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 14px;
+      font-size: 0.83rem;
+      font-weight: 500;
+      border-radius: var(--radius);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+      line-height: 1.2;
+    }
+    .btn-sm {
+      padding: 4px 8px;
+      font-size: 0.76rem;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+    }
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+    .btn-outline {
+      background: var(--surface);
+      border-color: var(--border);
+      color: var(--text);
+    }
+    .btn-outline:hover {
+      background: #f1f5f9;
+    }
+    .btn-danger {
+      background: #dc2626;
+      color: #fff;
+    }
+    .btn-danger:hover {
+      background: #b91c1c;
+    }
+    .btn-success {
+      background: #16a34a;
+      color: #fff;
+    }
+
+    /* Modals */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(2px);
+      z-index: 100;
+      padding: 20px;
+      overflow-y: auto;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal-dialog {
+      background: var(--surface);
+      border-radius: 10px;
+      width: 100%;
+      max-width: 680px;
+      margin: 30px auto;
+      border: 1px solid var(--border);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+      display: flex;
+      flex-direction: column;
+      animation: modalSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .modal-dialog.modal-lg {
+      max-width: 860px;
+    }
+    @keyframes modalSlide {
+      from { transform: translateY(-12px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-header h3 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .modal-body {
+      padding: 20px;
+      max-height: 72vh;
+      overflow-y: auto;
+    }
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      background: #f8fafc;
+      border-bottom-left-radius: 10px;
+      border-bottom-right-radius: 10px;
+    }
+
+    /* Form Fields */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px 16px;
+    }
+    .form-group.col-span-2 {
+      grid-column: span 2;
+    }
+    @media (max-width: 640px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+      .form-group.col-span-2 {
+        grid-column: span 1;
+      }
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .form-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .form-label.required::after {
+      content: " *";
+      color: #dc2626;
+    }
+    .form-control {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      font-size: 0.85rem;
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s ease;
+      font-family: inherit;
+    }
+    .form-control:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+    }
+    textarea.form-control {
+      min-height: 90px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      resize: vertical;
+    }
+
+    /* Functions Runner Panel */
+    .function-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+    .function-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .function-name {
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: monospace;
+      color: var(--accent-text);
+    }
+    .function-body-editor {
+      width: 100%;
+      min-height: 80px;
+      font-family: monospace;
+      font-size: 0.82rem;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: #f8fafc;
+      box-sizing: border-box;
+    }
+    .function-response {
+      margin-top: 10px;
+      background: #0f172a;
+      color: #38bdf8;
+      padding: 12px;
+      border-radius: var(--radius);
+      font-family: monospace;
+      font-size: 0.78rem;
+      white-space: pre-wrap;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    /* Feedback Alert / Toast */
+    .toast-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .toast {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.84rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+      animation: fadeIn 0.2s ease;
+      min-width: 260px;
+      max-width: 420px;
+    }
+    .toast-success { background: #16a34a; }
+    .toast-error { background: #dc2626; }
+    .toast-info { background: #0284c7; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Readonly detail viewer */
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .detail-item {
+      background: #f8fafc;
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      border: 1px solid #f1f5f9;
+    }
+    .detail-key {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .detail-val {
+      font-size: 0.84rem;
+      color: var(--text);
+      word-break: break-all;
+    }
+    .detail-val pre {
+      margin: 0;
+      font-family: monospace;
+      font-size: 0.76rem;
+      white-space: pre-wrap;
+    }
+
+    .doc-warning {
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      color: #92400e;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 0.74rem;
+      margin-top: 4px;
+    }
+
+    .source-mode-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .source-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .source-indicator.live { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+    .source-indicator.mock { background: #f59e0b; }
+
+    /* Priority Summary Cards */
+    .priority-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .priority-stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+      overflow: hidden;
+    }
+    .priority-stat-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      bottom: 0;
+      background: var(--border);
+    }
+    .priority-stat-card.card-primary::before { background: var(--accent); }
+    .priority-stat-card.card-success::before { background: #16a34a; }
+    .priority-stat-card.card-warning::before { background: #d97706; }
+    .priority-stat-card.card-danger::before { background: #dc2626; }
+    .priority-stat-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+    }
+    .priority-stat-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .priority-stat-desc {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Notice Banner -->
+  <div class="env-banner">
+    <div>
+      <strong>Aviso de Protótipo Aeronáutico:</strong> Este app consome o backend intermediário seguro. A chave da API fica protegida no servidor e nenhuma credencial mestra é exposta no navegador.
+    </div>
+    <div id="statusSourceBadge" class="source-mode-pill">
+      <span class="source-indicator live" id="sourceDot"></span>
+      <span id="sourceLabel">Backend Intermediário</span>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="brand">
+      <button class="icon-btn" id="btnToggleSidebar" aria-label="Abrir Menu" style="display:none;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+      </button>
+      <div class="brand-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">RSandoli Training Ops</div>
+        <div class="brand-sub">Backend Intermediário Seguro • Painel de Gestão</div>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <div class="backend-badge-pill" title="Origem das requisições">
+        <span>URL:</span>
+        <code id="headerBaseUrlDisplay">/api</code>
+        <span id="headerTokenIndicator" class="badge badge-neutral" style="font-size:0.68rem; margin-left:4px;">Sem Token</span>
+      </div>
+
+      <button class="btn btn-outline btn-sm" onclick="app.openSettingsModal()" title="Configurar URL do Backend e Token de Autenticação">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        Configurações
+      </button>
+
+      <button class="btn btn-outline btn-sm" id="btnPrintReport" title="Imprimir / Salvar em PDF">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+        Imprimir
+      </button>
+    </div>
+  </header>
+
+  <!-- Layout -->
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="appSidebar">
+      <!-- Groups populated by JS -->
+      <nav id="navContainer"></nav>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="main-content">
+      <!-- Dynamic View Container -->
+      <div id="viewContainer"></div>
+    </main>
+  </div>
+
+  <!-- Common Modals -->
+  <!-- Entity Create / Edit Modal -->
+  <div class="modal-overlay" id="modalEntityForm">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <h3 id="formModalTitle">Cadastrar Registro</h3>
+        <button class="icon-btn" onclick="app.closeModal('modalEntityForm')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <form id="entityDynamicForm" onsubmit="app.handleFormSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="formEntityId">
+          <div class="form-grid" id="formFieldsContainer">
+            <!-- Dynamic fields go here -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="app.closeModal('modalEntityForm')">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btnSubmitForm">Salvar Alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Entity Detail Modal -->
+  <div class="modal-overlay" id="modalEntityDetail">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <h3 id="detailModalTitle">Detalhes do Registro</h3>
+        <button class="icon-btn" onclick="app.closeModal('modalEntityDetail')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid" id="detailGridContainer"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="app.closeModal('modalEntityDetail')">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Operations Modal -->
+  <div class="modal-overlay" id="modalBulkOps">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="bulkModalTitle">Operações em Lote</h3>
+        <button class="icon-btn" onclick="app.closeModal('modalBulkOps')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label class="form-label">Tipo de Ação em Lote</label>
+          <select id="bulkActionType" class="form-control" onchange="app.renderBulkEditor(this.value)">
+            <option value="bulk_create">Criar em Lote (POST /bulk - JSON Array)</option>
+            <option value="bulk_update">Atualizar em Lote (PUT /bulk - Itens com ID)</option>
+            <option value="update_many">Atualizar por Query (PATCH /update-many - {query, data})</option>
+            <option value="bulk_delete">Exclusão em Lote com Filtro (DELETE /entities/{Entity})</option>
+          </select>
+        </div>
+        <div id="bulkWarningBox" style="display:none; margin-bottom: 12px;"></div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label" id="bulkPayloadLabel">JSON Payload</label>
+          <textarea id="bulkPayloadInput" class="form-control" style="min-height: 160px;" placeholder="[{...}]"></textarea>
+        </div>
+        <!-- Mandatory validation for bulk delete -->
+        <div id="bulkDeleteConfirmGroup" class="form-group" style="display:none; margin-top:12px; background:#fef2f2; border:1px solid #fecaca; padding:12px; border-radius:var(--radius);">
+          <label class="form-label required" style="color:#991b1b;">Confirmação de Segurança Obrigatória</label>
+          <p style="font-size:0.77rem; color:#7f1d1d; margin:0 0 8px 0;">
+            Para autorizar a exclusão em lote, digite exatamente o nome da entidade <strong id="bulkConfirmEntityExpected"></strong> abaixo. O header <code>X-Confirm-Delete</code> será enviado.
+          </p>
+          <input type="text" id="bulkConfirmEntityInput" class="form-control" placeholder="Digite o nome da entidade para autorizar...">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="app.closeModal('modalBulkOps')">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnExecuteBulk" onclick="app.executeBulkAction()">Executar Operação</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backend Settings Modal -->
+  <div class="modal-overlay" id="modalBackendSettings">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Configurações do Backend Intermediário</h3>
+        <button class="icon-btn" onclick="app.closeModal('modalBackendSettings')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label class="form-label">URL Base do Backend</label>
+          <input type="text" id="settingBaseUrlInput" class="form-control" placeholder="Padrão: /api (mesmo domínio)" value="/api">
+          <span style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
+            Padrão <code>/api</code>. Se o seu backend estiver em outro host, informe por exemplo <code>http://localhost:3000/api</code> ou <code>https://api.meuservidor.com/api</code>.
+          </span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Token do Backend (Opcional)</label>
+          <input type="password" id="settingTokenInput" class="form-control" placeholder="Bearer Token (armazenado apenas na sessão)" autocomplete="off">
+          <span style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
+            Se preenchido, será enviado como <code>Authorization: Bearer &lt;token&gt;</code>. Armazenado estritamente em <code>sessionStorage</code>. Nenhuma <code>api_key</code> mestra é enviada.
+          </span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="app.closeModal('modalBackendSettings')">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="app.saveSettings()">Salvar Configurações</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+  /**
+   * RSandoli Training Ops - Backend Intermediário Engine
+   */
+  const STORAGE_KEYS = {
+    baseUrl: 'rsandoli_backend_base_url',
+    token: 'rsandoli_backend_token'
+  };
+
+  // List of priority entities for enhanced UI
+  const PRIORITY_ENTITIES = ['Pilot', 'Oat', 'Aircraft', 'FlightLog', 'Schedule', 'ChecklistRecord'];
+
+  const API_CONFIG = {
+    baseUrl: sessionStorage.getItem(STORAGE_KEYS.baseUrl) || '/api',
+    token: sessionStorage.getItem(STORAGE_KEYS.token) || ''
+  };
+
+  // 24 ENTITIES METADATA & FIELD SCHEMAS
+  const ENTITIES = {
+    Pilot: {
+      name: 'Pilot',
+      label: 'Pilotos',
+      group: 'cadastros',
+      description: 'Cadastro cadastral de pilotos, qualificações e dados ANAC.',
+      primaryCols: ['full_name', 'war_name', 'registration', 'aircraftProfile', 'role', 'status'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil Aeronave', type: 'select', options: ['AW119', 'H125', 'shared'], default: 'AW119' },
+        { key: 'full_name', label: 'Nome Completo', type: 'text', required: true },
+        { key: 'war_name', label: 'Nome de Guerra', type: 'text' },
+        { key: 'registration', label: 'Registro CANAC / CPF', type: 'text' },
+        { key: 'role', label: 'Função Principal', type: 'select', options: ['commander', 'copilot', 'instructor', 'trainee', 'manager', 'first_officer', 'pilot_student', 'instructor_eventual', 'pilot_collaborator'] },
+        { key: 'status', label: 'Status Registro', type: 'select', options: ['active', 'inactive', 'vacation', 'leave', 'training', 'pending'] },
+        { key: 'email', label: 'E-mail', type: 'text' },
+        { key: 'phone', label: 'Telefone', type: 'text' },
+        { key: 'base', label: 'Base Operacional', type: 'text' },
+        { key: 'unit', label: 'Unidade', type: 'text' },
+        { key: 'anac_code', label: 'Código ANAC', type: 'text' },
+        { key: 'license_anac', label: 'Licença ANAC', type: 'text' },
+        { key: 'category', label: 'Categoria', type: 'text' },
+        { key: 'permission', label: 'Permissão', type: 'select', options: ['full', 'restricted'] },
+        { key: 'hours', label: 'Horas de Voo (JSON)', type: 'json' },
+        { key: 'documents', label: 'Documentos (JSON)', type: 'json' }
+      ]
+    },
+    Oat: {
+      name: 'Oat',
+      label: 'Operadores (OAT)',
+      group: 'cadastros',
+      description: 'Operadores de Apoio Tático e enfermagem aeromédica.',
+      primaryCols: ['full_name', 'war_name', 'role', 'base', 'unit', 'registration_status'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil Aeronave', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'full_name', label: 'Nome Completo', type: 'text', required: true },
+        { key: 'war_name', label: 'Nome de Guerra', type: 'text' },
+        { key: 'role', label: 'Função', type: 'select', options: ['oat', 'oat_nurse', 'instructor', 'pilot_collaborator', 'other'] },
+        { key: 'cpf', label: 'CPF', type: 'text' },
+        { key: 'email', label: 'E-mail', type: 'text' },
+        { key: 'phone', label: 'Telefone', type: 'text' },
+        { key: 'base', label: 'Base', type: 'text' },
+        { key: 'unit', label: 'Unidade', type: 'text' },
+        { key: 'registration_status', label: 'Status', type: 'select', options: ['active', 'inactive', 'vacation', 'leave', 'training', 'pending'] },
+        { key: 'approval_status', label: 'Aprovação', type: 'select', options: ['draft', 'pending_review', 'approved', 'rejected'] },
+        { key: 'hours', label: 'Horas de Voo (JSON)', type: 'json' }
+      ]
+    },
+    Aircraft: {
+      name: 'Aircraft',
+      label: 'Aeronaves',
+      group: 'cadastros',
+      description: 'Frota de helicópteros e dados de manutenção.',
+      primaryCols: ['registration', 'model', 'manufacturer', 'year', 'total_hours', 'status'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'registration', label: 'Prefixo (Matrícula)', type: 'text', required: true },
+        { key: 'model', label: 'Modelo', type: 'text', required: true },
+        { key: 'manufacturer', label: 'Fabricante', type: 'text' },
+        { key: 'year', label: 'Ano', type: 'number' },
+        { key: 'total_hours', label: 'Horas Totais', type: 'number' },
+        { key: 'total_mnt_hours', label: 'Horas Manutenção', type: 'number' },
+        { key: 'color', label: 'Cor / Pintura', type: 'text' },
+        { key: 'status', label: 'Status Aeronave', type: 'select', options: ['available', 'in_maintenance', 'grounded'] },
+        { key: 'approval_status', label: 'Aprovação', type: 'select', options: ['approved', 'pending', 'rejected'] },
+        { key: 'notes', label: 'Observações', type: 'textarea' }
+      ]
+    },
+    FlightLog: {
+      name: 'FlightLog',
+      label: 'Diários de Voo',
+      group: 'operacoes',
+      description: 'Registros de missões, saídas e horímetros de voo.',
+      primaryCols: ['date', 'aircraft_registration', 'pilot_name', 'flight_type', 'flight_time_minutes', 'landings'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil Aeronave', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'date', label: 'Data do Voo', type: 'date', required: true },
+        { key: 'aircraft_registration', label: 'Matrícula da Aeronave', type: 'text', required: true },
+        { key: 'pilot_name', label: 'Piloto em Comando', type: 'text', required: true },
+        { key: 'pilot_role', label: 'Função Piloto', type: 'select', options: ['comandante', 'instrutor', 'instrucao', 'single_pilot', 'single_pilot_copiloto'] },
+        { key: 'copilot_name', label: 'Segundo em Comando (Copiloto)', type: 'text' },
+        { key: 'departure_location', label: 'Origem', type: 'text' },
+        { key: 'arrival_location', label: 'Destino', type: 'text' },
+        { key: 'departure_time', label: 'Hora Decolagem (HH:MM)', type: 'text' },
+        { key: 'arrival_time', label: 'Hora Pouso (HH:MM)', type: 'text' },
+        { key: 'flight_time_minutes', label: 'Tempo Voo (minutos)', type: 'number', required: true },
+        { key: 'flight_type', label: 'Tipo de Voo', type: 'select', options: ['private', 'instruction', 'charter', 'ems', 'vip', 'photo', 'maintenance', 'other'] },
+        { key: 'landings', label: 'Pousos', type: 'number' },
+        { key: 'fuel_uplift_liters', label: 'Combustível Abastecido (L)', type: 'number' },
+        { key: 'notes', label: 'Notas Operacionais', type: 'textarea' }
+      ]
+    },
+    Schedule: {
+      name: 'Schedule',
+      label: 'Escalas de Voo',
+      group: 'operacoes',
+      description: 'Planejamento e alocação de tripulantes e aeronaves.',
+      primaryCols: ['date', 'period', 'aircraft_registration', 'crew_pilot_name', 'mission', 'status'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil Aeronave', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'date', label: 'Data', type: 'date', required: true },
+        { key: 'start_time', label: 'Início (HH:MM)', type: 'text' },
+        { key: 'end_time', label: 'Término (HH:MM)', type: 'text' },
+        { key: 'period', label: 'Período', type: 'select', options: ['manha', 'tarde', 'noite', 'integral', 'outro'] },
+        { key: 'aircraft_registration', label: 'Aeronave', type: 'text' },
+        { key: 'crew_pilot_name', label: 'Piloto', type: 'text' },
+        { key: 'crew_copilot_name', label: 'Copiloto', type: 'text' },
+        { key: 'base', label: 'Base de Operação', type: 'text' },
+        { key: 'mission', label: 'Missão Prevista', type: 'text' },
+        { key: 'status', label: 'Status da Escala', type: 'select', options: ['planejada', 'confirmada', 'em_andamento', 'concluida', 'cancelada'] },
+        { key: 'observations', label: 'Observações', type: 'textarea' }
+      ]
+    },
+    ChecklistRecord: {
+      name: 'ChecklistRecord',
+      label: 'Checklists Operacionais',
+      group: 'operacoes',
+      description: 'Auditoria de checklists pré-voo, pós-voo e itens de missão.',
+      primaryCols: ['date', 'aircraft_registration', 'pic_name', 'mission_type', 'status', 'duration_minutes'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil Aeronave', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'date', label: 'Data', type: 'date', required: true },
+        { key: 'aircraft_registration', label: 'Aeronave', type: 'text', required: true },
+        { key: 'horimeter_initial', label: 'Horímetro Inicial', type: 'number' },
+        { key: 'fuel_initial', label: 'Combustível Inicial', type: 'number' },
+        { key: 'pic_name', label: 'Piloto em Comando', type: 'text' },
+        { key: 'pic_canac', label: 'CANAC Piloto', type: 'text' },
+        { key: 'mission_type', label: 'Tipo de Missão', type: 'select', options: ['instrucao', 'treinamento', 'transporte', 'aeromedico', 'seguranca_publica', 'patrulhamento', 'sar', 'fiscalizacao', 'outro'] },
+        { key: 'status', label: 'Status Decisão', type: 'select', options: ['ok', 'pending_items', 'no_go'] },
+        { key: 'duration_minutes', label: 'Duração (min)', type: 'number' },
+        { key: 'phases_progress', label: 'Fases Realizadas (JSON)', type: 'json' },
+        { key: 'justification', label: 'Justificativa', type: 'textarea' }
+      ]
+    },
+    PilotLicense: {
+      name: 'PilotLicense',
+      label: 'Licenças de Piloto',
+      group: 'documentacao',
+      description: 'Licenças técnicas (PPH, PCH, PLA, PLAH) e controle de vencimentos.',
+      primaryCols: ['pilot_name', 'license_type', 'license_number', 'expiry_date', 'situation', 'approval_status'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'pilot_name', label: 'Piloto', type: 'text', required: true },
+        { key: 'license_number', label: 'Número da Licença', type: 'text', required: true },
+        { key: 'license_type', label: 'Tipo de Licença', type: 'select', options: ['pph', 'pch', 'ppa', 'pca_ifr', 'pla', 'plah', 'other'] },
+        { key: 'issue_date', label: 'Data de Emissão', type: 'date' },
+        { key: 'expiry_date', label: 'Data de Validade', type: 'date' },
+        { key: 'situation', label: 'Situação', type: 'select', options: ['valid', 'near_expiry', 'expired', 'suspended', 'renewing', 'pending', 'na'] },
+        { key: 'authority', label: 'Autoridade Emissora', type: 'text', default: 'ANAC' },
+        { key: 'approval_status', label: 'Status Aprovação', type: 'select', options: ['draft', 'pending_review', 'approved', 'rejected'] },
+        { key: 'document_uri', label: 'URI do Documento', type: 'text' },
+        { key: 'notes', label: 'Observações', type: 'textarea' }
+      ]
+    },
+    PilotHabilitacao: {
+      name: 'PilotHabilitacao',
+      label: 'Habilitações Técnicas',
+      group: 'documentacao',
+      description: 'Habilitações de tipo (ex.: HM11, HM25, IFR) e vigências.',
+      primaryCols: ['pilot_name', 'type', 'number', 'expiry_date', 'situation', 'approval_status'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'pilot_name', label: 'Piloto', type: 'text', required: true },
+        { key: 'type', label: 'Tipo / Sigla', type: 'text', required: true },
+        { key: 'type_label', label: 'Descrição da Habilitação', type: 'text' },
+        { key: 'number', label: 'Número', type: 'text' },
+        { key: 'issue_date', label: 'Data de Emissão', type: 'date' },
+        { key: 'expiry_date', label: 'Data de Vencimento', type: 'date' },
+        { key: 'situation', label: 'Situação', type: 'select', options: ['valid', 'near_expiry', 'expired', 'suspended', 'renewing', 'pending', 'na'] },
+        { key: 'authority', label: 'Autoridade', type: 'text' },
+        { key: 'approval_status', label: 'Aprovação', type: 'select', options: ['draft', 'pending_review', 'approved', 'rejected'] },
+        { key: 'document_uri', label: 'URI do Documento', type: 'text' }
+      ]
+    },
+    PilotQualification: {
+      name: 'PilotQualification',
+      label: 'Qualificações Operacionais',
+      group: 'documentacao',
+      description: 'Treinamentos periódicos de solo, simulador e proficiência.',
+      primaryCols: ['pilot_name', 'type', 'issue_date', 'expiry_date', 'situation', 'approval_status'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'pilot_name', label: 'Nome do Piloto', type: 'text', required: true },
+        { key: 'type', label: 'Tipo da Qualificação', type: 'text', required: true },
+        { key: 'type_label', label: 'Rótulo/Descrição', type: 'text' },
+        { key: 'number', label: 'Número Certificado', type: 'text' },
+        { key: 'issue_date', label: 'Data Conclusão', type: 'date' },
+        { key: 'expiry_date', label: 'Validade', type: 'date' },
+        { key: 'situation', label: 'Situação', type: 'select', options: ['valid', 'near_expiry', 'expired', 'suspended', 'renewing', 'pending', 'na'] },
+        { key: 'approval_status', label: 'Aprovação', type: 'select', options: ['draft', 'pending_review', 'approved', 'rejected'] }
+      ]
+    },
+    PilotEndorsement: {
+      name: 'PilotEndorsement',
+      label: 'Endossos de Modelo',
+      group: 'documentacao',
+      description: 'Endossos de aeronaves e funções autorizadas.',
+      primaryCols: ['pilot_name', 'aircraft_model', 'function', 'expiry_date', 'situation', 'approval_status'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'pilot_name', label: 'Piloto', type: 'text', required: true },
+        { key: 'aircraft_model', label: 'Modelo da Aeronave', type: 'text', required: true },
+        { key: 'function', label: 'Função Autorizada', type: 'text' },
+        { key: 'issue_date', label: 'Emissão', type: 'date' },
+        { key: 'expiry_date', label: 'Vencimento', type: 'date' },
+        { key: 'situation', label: 'Situação', type: 'select', options: ['valid', 'near_expiry', 'expired', 'suspended', 'renewing', 'pending', 'na'] },
+        { key: 'approval_status', label: 'Aprovação', type: 'select', options: ['draft', 'pending_review', 'approved', 'rejected'] }
+      ]
+    },
+    PilotOperationalAuth: {
+      name: 'PilotOperationalAuth',
+      label: 'Autorizações Operacionais',
+      group: 'documentacao',
+      description: 'Autorizações especiais (SAR, NVG, Guincho, Gancho).',
+      primaryCols: ['pilot_name', 'type', 'number', 'expiry_date', 'situation', 'approval_status'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'pilot_name', label: 'Piloto', type: 'text', required: true },
+        { key: 'type', label: 'Tipo Autorização', type: 'text', required: true },
+        { key: 'number', label: 'Número Portaria/Ato', type: 'text' },
+        { key: 'issue_date', label: 'Data de Emissão', type: 'date' },
+        { key: 'expiry_date', label: 'Vigência', type: 'date' },
+        { key: 'situation', label: 'Situação', type: 'select', options: ['valid', 'near_expiry', 'expired', 'suspended', 'renewing', 'pending', 'na'] },
+        { key: 'scope', label: 'Escopo Operacional', type: 'text' },
+        { key: 'approval_status', label: 'Aprovação', type: 'select', options: ['draft', 'pending_review', 'approved', 'rejected'] }
+      ]
+    },
+    LibraryDocument: {
+      name: 'LibraryDocument',
+      label: 'Biblioteca Técnica',
+      group: 'documentacao',
+      description: 'Manuais de voo, POPs, MEL, QRH e diretrizes técnicas.',
+      primaryCols: ['title', 'category', 'doc_number', 'revision_number', 'status', 'approval_status'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'title', label: 'Título do Documento', type: 'text', required: true },
+        { key: 'category', label: 'Categoria', type: 'text' },
+        { key: 'doc_number', label: 'Código/Número', type: 'text' },
+        { key: 'revision_number', label: 'Revisão', type: 'text' },
+        { key: 'revision_date', label: 'Data da Revisão', type: 'date' },
+        { key: 'validity_date', label: 'Data de Validade', type: 'date' },
+        { key: 'status', label: 'Status', type: 'select', options: ['active', 'superseded', 'archived', 'review'] },
+        { key: 'file_uri', label: 'URI do Arquivo', type: 'text' },
+        { key: 'approval_status', label: 'Aprovação', type: 'select', options: ['pending_review', 'approved', 'approved_with_notes', 'rejected'] }
+      ]
+    },
+    TrainingDocument: {
+      name: 'TrainingDocument',
+      label: 'Materiais de Instrução',
+      group: 'treinamento',
+      description: 'Manuais de treinamento, slides PPSX, apostilas e vídeos de instrução.',
+      primaryCols: ['title', 'discipline', 'chapter', 'file_type', 'status', 'approval_status'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'title', label: 'Título da Instrução', type: 'text', required: true },
+        { key: 'discipline', label: 'Disciplina / Matéria', type: 'text' },
+        { key: 'chapter', label: 'Capítulo', type: 'text' },
+        { key: 'file_type', label: 'Formato', type: 'select', options: ['pdf', 'ppsx', 'pptx', 'video', 'image', 'other'] },
+        { key: 'file_uri', label: 'URI do Material', type: 'text' },
+        { key: 'description', label: 'Descrição / Conteúdo', type: 'textarea' },
+        { key: 'status', label: 'Status', type: 'select', options: ['active', 'archived'] },
+        { key: 'approval_status', label: 'Aprovação', type: 'select', options: ['pending_review', 'approved', 'rejected'] }
+      ]
+    },
+    TrainingCompletion: {
+      name: 'TrainingCompletion',
+      label: 'Conclusões de Treino',
+      group: 'treinamento',
+      description: 'Certificados de conclusão, notas e horas de formação.',
+      primaryCols: ['pilot_name', 'training_title', 'discipline', 'status', 'score', 'completed_at'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'pilot_name', label: 'Piloto / Aluno', type: 'text', required: true },
+        { key: 'training_title', label: 'Treinamento', type: 'text', required: true },
+        { key: 'discipline', label: 'Disciplina', type: 'text' },
+        { key: 'status', label: 'Status', type: 'select', options: ['pending', 'completed'] },
+        { key: 'score', label: 'Nota / Rendimento', type: 'number' },
+        { key: 'completed_at', label: 'Data Conclusão', type: 'date' },
+        { key: 'notes', label: 'Parecer do Instrutor', type: 'textarea' }
+      ]
+    },
+    ProgressRecord: {
+      name: 'ProgressRecord',
+      label: 'Progresso E-learning',
+      group: 'treinamento',
+      description: 'Telemetria de módulos LMS, tempo de estudo e critérios.',
+      primaryCols: ['content_title', 'content_type', 'status', 'score', 'time_spent_seconds', 'last_accessed_at'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'content_title', label: 'Título do Conteúdo', type: 'text', required: true },
+        { key: 'content_type', label: 'Tipo', type: 'select', options: ['modulo', 'topico', 'aula', 'atividade', 'avaliacao'] },
+        { key: 'status', label: 'Status', type: 'select', options: ['nao_iniciado', 'em_andamento', 'concluido', 'revisao_recomendada', 'pendente', 'vencido', 'bloqueado'] },
+        { key: 'score', label: 'Nota Atual', type: 'number' },
+        { key: 'time_spent_seconds', label: 'Tempo Estudo (segundos)', type: 'number' },
+        { key: 'last_accessed_at', label: 'Último Acesso', type: 'date' },
+        { key: 'completion_criteria', label: 'Critérios (JSON)', type: 'json' }
+      ]
+    },
+    PilotChangeRequest: {
+      name: 'PilotChangeRequest',
+      label: 'Solicitações de Piloto',
+      group: 'solicitacoes',
+      description: 'Pedidos de alteração cadastral enviados pelos pilotos.',
+      primaryCols: ['pilot_name', 'requested_by', 'status', 'reviewed_by', 'created_date'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'pilot_name', label: 'Nome do Piloto', type: 'text', required: true },
+        { key: 'requested_by', label: 'Solicitante', type: 'text' },
+        { key: 'status', label: 'Status', type: 'select', options: ['pending', 'approved', 'rejected'] },
+        { key: 'changes', label: 'Modificações Solicitadas (JSON)', type: 'json', required: true },
+        { key: 'reviewed_by', label: 'Revisado Por', type: 'text' }
+      ]
+    },
+    OatChangeRequest: {
+      name: 'OatChangeRequest',
+      label: 'Solicitações de OAT',
+      group: 'solicitacoes',
+      description: 'Alterações cadastrais e funcionais para operadores.',
+      primaryCols: ['oat_name', 'change_type', 'status', 'reviewed_by', 'created_date'],
+      fields: [
+        { key: 'aircraftProfile', label: 'Perfil', type: 'select', options: ['AW119', 'H125', 'shared'] },
+        { key: 'oat_name', label: 'Nome do OAT', type: 'text', required: true },
+        { key: 'change_type', label: 'Classificação', type: 'select', options: ['simple', 'operational', 'critical'] },
+        { key: 'status', label: 'Status', type: 'select', options: ['draft', 'pending', 'in_review', 'doc_check', 'tech_review', 'approved', 'rejected', 'cancelled', 'expired', 'completed'] },
+        { key: 'changes', label: 'Campos Alterados (JSON)', type: 'json', required: true },
+        { key: 'reason', label: 'Motivo / Justificativa', type: 'textarea' },
+        { key: 'reviewed_by', label: 'Revisor', type: 'text' }
+      ]
+    },
+    User: {
+      name: 'User',
+      label: 'Usuários do Sistema',
+      group: 'admin',
+      description: 'Acessos administrativos, operacionais e regras MFA.',
+      primaryCols: ['full_name', 'email', 'access_level', 'account_status', 'last_login_at'],
+      fields: [
+        { key: 'full_name', label: 'Nome Completo', type: 'text', required: true },
+        { key: 'email', label: 'E-mail', type: 'text', required: true },
+        { key: 'login', label: 'Login', type: 'text' },
+        { key: 'role', label: 'Papel Básico', type: 'select', options: ['admin', 'user'] },
+        { key: 'access_level', label: 'Nível de Acesso', type: 'select', options: ['admin_geral', 'administrador', 'gestor_supervisor', 'operacional', 'consulta'] },
+        { key: 'account_status', label: 'Status da Conta', type: 'select', options: ['ativa', 'convite_pendente', 'bloqueada', 'suspensa', 'desativada'] },
+        { key: 'registration', label: 'Matrícula / ID', type: 'text' },
+        { key: 'unit', label: 'Unidade Operacional', type: 'text' },
+        { key: 'job_title', label: 'Cargo', type: 'text' },
+        { key: 'custom_permissions', label: 'Permissões Customizadas (JSON)', type: 'json' }
+      ]
+    },
+    UserInvite: {
+      name: 'UserInvite',
+      label: 'Convites de Acesso',
+      group: 'admin',
+      description: 'Convites para cadastro de novos operadores e tripulantes.',
+      primaryCols: ['full_name', 'email', 'access_level', 'status', 'invited_by_name', 'created_at'],
+      fields: [
+        { key: 'full_name', label: 'Nome Convidado', type: 'text', required: true },
+        { key: 'email', label: 'E-mail de Envio', type: 'text', required: true },
+        { key: 'access_level', label: 'Nível Concedido', type: 'select', options: ['admin_geral', 'administrador', 'gestor_supervisor', 'operacional', 'consulta'] },
+        { key: 'status', label: 'Status Convite', type: 'select', options: ['pending', 'accepted', 'cancelled'] },
+        { key: 'unit', label: 'Unidade Alocada', type: 'text' },
+        { key: 'admin_notes', label: 'Observações Internas', type: 'textarea' }
+      ]
+    },
+    AccountStatus: {
+      name: 'AccountStatus',
+      label: 'Histórico de Bloqueios',
+      group: 'admin',
+      description: 'Trilhas de auditoria para suspensão e reativação de contas.',
+      primaryCols: ['user_id', 'status', 'set_by', 'set_at', 'reason'],
+      fields: [
+        { key: 'user_id', label: 'ID do Usuário', type: 'text', required: true },
+        { key: 'status', label: 'Status Aplicado', type: 'select', options: ['ativa', 'convite_pendente', 'bloqueada', 'suspensa', 'desativada'] },
+        { key: 'set_by', label: 'Aplicado Por', type: 'text' },
+        { key: 'reason', label: 'Motivo do Status', type: 'textarea' }
+      ]
+    },
+    AccessCode: {
+      name: 'AccessCode',
+      label: 'Códigos OTP (2FA)',
+      group: 'admin',
+      description: 'Tokens temporários para operações sensíveis e recuperação. (Somente Leitura)',
+      readOnly: true,
+      primaryCols: ['user_email', 'purpose', 'channel', 'expires_at', 'used', 'created_at'],
+      fields: [
+        { key: 'user_email', label: 'E-mail Mascarado', type: 'text' },
+        { key: 'purpose', label: 'Finalidade', type: 'select', options: ['login', 'sensitive_op'] },
+        { key: 'channel', label: 'Canal', type: 'text' },
+        { key: 'expires_at', label: 'Expira Em', type: 'date' },
+        { key: 'used', label: 'Utilizado', type: 'text' }
+      ]
+    },
+    AccessAuditLog: {
+      name: 'AccessAuditLog',
+      label: 'Auditoria de Acesso',
+      group: 'admin',
+      description: 'Logs imutáveis de ações de segurança e logins. (Somente Leitura)',
+      readOnly: true,
+      primaryCols: ['actor_name', 'action', 'target_name', 'created_at'],
+      fields: [
+        { key: 'actor_name', label: 'Ator da Ação', type: 'text' },
+        { key: 'action', label: 'Ação Realizada', type: 'text' },
+        { key: 'target_name', label: 'Alvo', type: 'text' },
+        { key: 'details', label: 'Detalhes', type: 'text' },
+        { key: 'session_info', label: 'Sessão', type: 'text' }
+      ]
+    },
+    TermsAcceptance: {
+      name: 'TermsAcceptance',
+      label: 'Aceites de Termos',
+      group: 'admin',
+      description: 'Termos de confidencialidade de voo aceitos pelos usuários.',
+      primaryCols: ['user_email', 'terms_version', 'accepted_at', 'ip_address'],
+      fields: [
+        { key: 'user_email', label: 'E-mail', type: 'text', required: true },
+        { key: 'terms_version', label: 'Versão do Termo', type: 'text', default: 'v1' },
+        { key: 'accepted_at', label: 'Data Aceite', type: 'date' },
+        { key: 'ip_address', label: 'IP de Registro', type: 'text' }
+      ]
+    },
+    ProjectMilestone: {
+      name: 'ProjectMilestone',
+      label: 'Marcos do Projeto',
+      group: 'projeto',
+      description: 'Roadmap de engenharia, entregas de software e posts LinkedIn.',
+      primaryCols: ['title', 'category', 'status', 'milestone_date', 'auto_publish'],
+      fields: [
+        { key: 'title', label: 'Título do Marco', type: 'text', required: true },
+        { key: 'description', label: 'Descrição da Entrega', type: 'textarea' },
+        { key: 'category', label: 'Categoria', type: 'select', options: ['feature', 'modulo', 'integracao', 'seguranca', 'infra', 'conteudo', 'outro'] },
+        { key: 'status', label: 'Status', type: 'select', options: ['planejado', 'em_andamento', 'concluido', 'publicado'] },
+        { key: 'milestone_date', label: 'Data Prevista', type: 'date' },
+        { key: 'linkedin_text', label: 'Texto Divulgação LinkedIn', type: 'textarea' },
+        { key: 'auto_publish', label: 'Publicação Automática', type: 'select', options: ['true', 'false'] }
+      ]
+    }
+  };
+
+  // BACKEND FUNCTIONS DEFINITIONS
+  const BACKEND_FUNCTIONS = [
+    { name: 'manageUsers', desc: 'Gerenciamento operacional e provisioning de contas de pilotos e instrutores.', sample: { action: 'list_pending', filter: { unit: 'Alpha' } } },
+    { name: 'accessCode', desc: 'Disparo de códigos de verificação de dois fatores e autenticação.', sample: { action: 'generate', channel: 'email', email: 'piloto@rsandoli.aero' } },
+    { name: 'acceptTerms', desc: 'Registro formal de consentimento dos termos de segurança operacional.', sample: { terms_version: 'v1.2', accepted: true } },
+    { name: 'publishMilestoneLinkedIn', desc: 'Disparo de publicação automática de marco concluído na rede profissional.', sample: { milestone_id: 'milestone_01', visibility: 'public' } },
+    { name: 'downloadPptxFromUrl', desc: 'Conversão e processamento de apresentações PPTX de instrução de voo.', sample: { source_url: 'https://storage.aero/manual_aw119.pptx' } },
+    { name: 'completePasswordChange', desc: 'Finalização segura de troca e redefinição de credenciais de tripulante.', sample: { token: 'sample_token_xyz', new_password_hash: '...' } },
+    { name: 'approveTechnicalValidations', desc: 'Validação em lote de proficiência técnica de horas e endossos.', sample: { entity: 'PilotLicense', ids: ['lic_01', 'lic_02'], decision: 'approved' } },
+    { name: 'approveAcademyContent', desc: 'Homologação pedagógica de módulos de treinamento técnico.', sample: { content_id: 'doc_119_intro', approved_by: 'Chefe de Instrução' } }
+  ];
+
+  // NAVIGATION GROUPS: "Prioritários" at the top in exact requested order, followed by other groups
+  const NAV_GROUPS = [
+    {
+      id: 'prioritarios',
+      label: '★ Prioritários',
+      entities: ['Pilot', 'Oat', 'Aircraft', 'FlightLog', 'Schedule', 'ChecklistRecord']
+    },
+    {
+      id: 'documentacao',
+      label: 'Habilitações & Documentos',
+      entities: ['PilotLicense', 'PilotHabilitacao', 'PilotQualification', 'PilotEndorsement', 'PilotOperationalAuth', 'LibraryDocument']
+    },
+    {
+      id: 'treinamento',
+      label: 'Instrução & Treinamento',
+      entities: ['TrainingDocument', 'TrainingCompletion', 'ProgressRecord']
+    },
+    {
+      id: 'solicitacoes',
+      label: 'Solicitações e Mudanças',
+      entities: ['PilotChangeRequest', 'OatChangeRequest']
+    },
+    {
+      id: 'admin',
+      label: 'Administração & Auditoria',
+      entities: ['User', 'UserInvite', 'AccountStatus', 'AccessCode', 'AccessAuditLog', 'TermsAcceptance']
+    },
+    {
+      id: 'projeto',
+      label: 'Marcos & Roadmap',
+      entities: ['ProjectMilestone']
+    },
+    { id: 'funcoes', label: 'Funções de Backend', isFunctions: true }
+  ];
+
+  // IN-MEMORY MOCK STORE FOR INSTANT SEEDING
+  const mockDatabase = {
+    Pilot: [
+      { id: 'plt-01', aircraftProfile: 'AW119', full_name: 'Capitão Rodrigo Sandoli', war_name: 'Sandoli', registration: 'CANAC-124982', role: 'commander', status: 'active', email: 'rodrigo.sandoli@rsandoli.aero', phone: '(11) 98765-4321', base: 'SBMT - Campo de Marte', unit: 'Esquadrão Águia', anac_code: '124982', license_anac: 'PLAH 09182', category: 'Helicóptero', permission: 'full', created_date: '2025-01-10T10:00:00Z' },
+      { id: 'plt-02', aircraftProfile: 'H125', full_name: 'Major Marcos Alcantara', war_name: 'Alcantara', registration: 'CANAC-188204', role: 'instructor', status: 'active', email: 'm.alcantara@rsandoli.aero', phone: '(11) 99123-8899', base: 'SBMT - Campo de Marte', unit: 'Divisão de Instrução', anac_code: '188204', license_anac: 'PCH 14421', category: 'Helicóptero', permission: 'full', created_date: '2025-01-12T14:30:00Z' },
+      { id: 'plt-03', aircraftProfile: 'shared', full_name: 'Tenente Flávia Guimarães', war_name: 'Guimarães', registration: 'CANAC-219401', role: 'copilot', status: 'training', email: 'f.guimaraes@rsandoli.aero', phone: '(19) 98112-3344', base: 'SDCO - Sorocaba', unit: 'Operações Táticas', anac_code: '219401', license_anac: 'PPH 88123', category: 'Helicóptero', permission: 'restricted', created_date: '2025-02-01T08:15:00Z' }
+    ],
+    Oat: [
+      { id: 'oat-01', aircraftProfile: 'AW119', full_name: 'Sargento Carlos Eduardo Lima', war_name: 'C. Eduardo', role: 'oat', cpf: '312.456.789-00', email: 'carlos.lima@rsandoli.aero', phone: '(11) 97123-0099', base: 'SBMT', unit: 'Apoio Aéreo', registration_status: 'active', approval_status: 'approved', created_date: '2025-01-15T09:00:00Z' },
+      { id: 'oat-02', aircraftProfile: 'H125', full_name: 'Dra. Patricia Medeiros', war_name: 'Medeiros', role: 'oat_nurse', cpf: '445.678.910-11', email: 'p.medeiros@aeromedico.br', phone: '(11) 96543-2109', base: 'SBGR', unit: 'Aeromédico', registration_status: 'active', approval_status: 'approved', created_date: '2025-01-18T11:20:00Z' }
+    ],
+    Aircraft: [
+      { id: 'ac-01', aircraftProfile: 'AW119', registration: 'PR-RST', model: 'AW119Kx Koala', manufacturer: 'Leonardo Helicopters', year: 2022, total_hours: 840, total_mnt_hours: 40, color: 'Azul e Prata', status: 'available', approval_status: 'approved', notes: 'Pronta resposta. Manutenção de 100h em dia.', created_date: '2025-01-05T08:00:00Z' },
+      { id: 'ac-02', aircraftProfile: 'H125', registration: 'PP-ESA', model: 'H125 Esquilo B3e', manufacturer: 'Airbus / Helibras', year: 2021, total_hours: 1210, total_mnt_hours: 110, color: 'Branco e Cinza', status: 'available', approval_status: 'approved', notes: 'Equipado com guincho Goodrich e gancho de carga.', created_date: '2025-01-06T09:30:00Z' },
+      { id: 'ac-03', aircraftProfile: 'H125', registration: 'PR-MNT', model: 'AS350 B2', manufacturer: 'Helibras', year: 2018, total_hours: 2450, total_mnt_hours: 210, color: 'Azul Marinho', status: 'in_maintenance', approval_status: 'pending', notes: 'Inspeção de turbina Arriel 1D1.', created_date: '2025-01-08T15:00:00Z' }
+    ],
+    FlightLog: [
+      { id: 'fl-01', aircraftProfile: 'AW119', date: '2025-03-01', aircraft_registration: 'PR-RST', pilot_name: 'Capitão Rodrigo Sandoli', pilot_role: 'comandante', copilot_name: 'Tenente Flávia Guimarães', copilot_role: 'copiloto', departure_location: 'SBMT', arrival_location: 'SDCO', departure_time: '08:30', arrival_time: '09:15', flight_time_minutes: 45, flight_type: 'ems', landings: 1, fuel_uplift_liters: 280, notes: 'Transporte aeromédico concluído com segurança.', created_date: '2025-03-01T10:00:00Z' },
+      { id: 'fl-02', aircraftProfile: 'H125', date: '2025-03-02', aircraft_registration: 'PP-ESA', pilot_name: 'Major Marcos Alcantara', pilot_role: 'instrutor', copilot_name: 'Tenente Flávia Guimarães', copilot_role: 'instrucao', departure_location: 'SBMT', arrival_location: 'SBMT', departure_time: '14:00', arrival_time: '15:20', flight_time_minutes: 80, flight_type: 'instruction', landings: 6, fuel_uplift_liters: 150, notes: 'Treinamento de autorrotação e pouso em área restrita.', created_date: '2025-03-02T16:00:00Z' }
+    ],
+    Schedule: [
+      { id: 'sch-01', aircraftProfile: 'AW119', date: '2025-03-05', start_time: '07:00', end_time: '13:00', period: 'manha', aircraft_registration: 'PR-RST', crew_pilot_name: 'Capitão Rodrigo Sandoli', crew_copilot_name: 'Tenente Flávia Guimarães', base: 'SBMT', mission: 'Prontidão Resgate Aeromédico', status: 'confirmada', observations: 'Voo IFR sob demanda.', created_date: '2025-03-01T08:00:00Z' },
+      { id: 'sch-02', aircraftProfile: 'H125', date: '2025-03-05', start_time: '13:00', end_time: '19:00', period: 'tarde', aircraft_registration: 'PP-ESA', crew_pilot_name: 'Major Marcos Alcantara', crew_copilot_name: '-', base: 'SBMT', mission: 'Patrulhamento e Instrução H125', status: 'planejada', observations: 'Previsão de tempo CAVOK.', created_date: '2025-03-02T09:00:00Z' }
+    ],
+    ChecklistRecord: [
+      { id: 'chk-01', aircraftProfile: 'AW119', date: '2025-03-01', aircraft_registration: 'PR-RST', pic_name: 'Rodrigo Sandoli', pic_canac: '124982', mission_type: 'aeromedico', status: 'ok', duration_minutes: 18, horimeter_initial: 839.2, fuel_initial: 420, justification: 'Aeronave liberada sem discrepâncias técnicas.', created_date: '2025-03-01T08:15:00Z' }
+    ],
+    PilotLicense: [
+      { id: 'lic-01', aircraftProfile: 'AW119', pilot_name: 'Capitão Rodrigo Sandoli', license_type: 'plah', license_number: 'PLAH-124982', issue_date: '2020-04-10', expiry_date: '2026-04-10', situation: 'valid', authority: 'ANAC', approval_status: 'approved', notes: 'Licença Plena de Piloto de Linha Aérea de Helicóptero', created_date: '2025-01-10T11:00:00Z' },
+      { id: 'lic-02', aircraftProfile: 'H125', pilot_name: 'Major Marcos Alcantara', license_type: 'pch', license_number: 'PCH-188204', issue_date: '2021-06-15', expiry_date: '2025-06-15', situation: 'near_expiry', authority: 'ANAC', approval_status: 'approved', notes: 'Revalidação IFR em andamento.', created_date: '2025-01-12T15:00:00Z' }
+    ],
+    PilotHabilitacao: [
+      { id: 'hab-01', aircraftProfile: 'AW119', pilot_name: 'Capitão Rodrigo Sandoli', type: 'HM11', type_label: 'Habilitação Tipo AgustaWestland 119', number: 'HAB-119-902', issue_date: '2022-01-10', expiry_date: '2026-01-10', situation: 'valid', authority: 'ANAC', approval_status: 'approved', created_date: '2025-01-10T12:00:00Z' },
+      { id: 'hab-02', aircraftProfile: 'H125', pilot_name: 'Major Marcos Alcantara', type: 'HM25', type_label: 'Habilitação Tipo Esquilo HB350 / H125', number: 'HAB-125-442', issue_date: '2022-05-20', expiry_date: '2025-11-20', situation: 'valid', authority: 'ANAC', approval_status: 'approved', created_date: '2025-01-12T16:00:00Z' }
+    ],
+    PilotQualification: [
+      { id: 'qlf-01', aircraftProfile: 'AW119', pilot_name: 'Capitão Rodrigo Sandoli', type: 'SIM-AW119', type_label: 'Simulador Nível D - Leonardo Helicopters', number: 'SIM-2024-88', issue_date: '2024-08-14', expiry_date: '2025-08-14', situation: 'valid', approval_status: 'approved', created_date: '2025-01-10T13:00:00Z' }
+    ],
+    PilotEndorsement: [
+      { id: 'end-01', aircraftProfile: 'AW119', pilot_name: 'Capitão Rodrigo Sandoli', aircraft_model: 'AW119Kx', function: 'Instrutor de Voo e Checador', issue_date: '2023-02-15', expiry_date: '2026-02-15', situation: 'valid', approval_status: 'approved', created_date: '2025-01-10T14:00:00Z' }
+    ],
+    PilotOperationalAuth: [
+      { id: 'auth-01', aircraftProfile: 'AW119', pilot_name: 'Capitão Rodrigo Sandoli', type: 'SAR / NVG', number: 'AUTH-NVG-004', issue_date: '2024-03-01', expiry_date: '2026-03-01', situation: 'valid', scope: 'Operação com Óculos de Visão Noturna e Guincho de Salvamento', approval_status: 'approved', created_date: '2025-01-10T15:00:00Z' }
+    ],
+    LibraryDocument: [
+      { id: 'lib-01', aircraftProfile: 'AW119', title: 'Manual de Voo da Aeronave (AFM) AW119Kx', category: 'Manual de Operações', doc_number: 'AFM-AW119-03', revision_number: 'Rev 14', status: 'active', approval_status: 'approved', file_uri: 'https://docs.aero/afm_aw119.pdf', created_date: '2025-01-02T10:00:00Z' },
+      { id: 'lib-02', aircraftProfile: 'H125', title: 'Lista de Equipamentos Mínimos (MEL) H125', category: 'MEL', doc_number: 'MEL-H125-02', revision_number: 'Rev 07', status: 'active', approval_status: 'approved', file_uri: 'https://docs.aero/mel_h125.pdf', created_date: '2025-01-03T11:00:00Z' }
+    ],
+    TrainingDocument: [
+      { id: 'td-01', aircraftProfile: 'AW119', title: 'Sistemas Hidráulicos e Aviônicos Garmin G1000H', discipline: 'Conhecimentos Técnicos', chapter: 'Capítulo 4', file_type: 'ppsx', status: 'active', approval_status: 'approved', description: 'Instrução multimídia dos atuadores hidráulicos duplos e barramentos elétricos.', created_date: '2025-01-14T09:00:00Z' },
+      { id: 'td-02', aircraftProfile: 'shared', title: 'Gerenciamento de Recursos de Cabine (CRM)', discipline: 'Fatores Humanos', chapter: 'Módulo Geral', file_type: 'pdf', status: 'active', approval_status: 'approved', description: 'Comunicação, consciência situacional e tomada de decisão em emergências.', created_date: '2025-01-16T10:30:00Z' }
+    ],
+    TrainingCompletion: [
+      { id: 'tc-01', aircraftProfile: 'AW119', pilot_name: 'Capitão Rodrigo Sandoli', training_title: 'Sistemas Hidráulicos AW119', discipline: 'Conhecimentos Técnicos', status: 'completed', score: 98, completed_at: '2025-02-10', notes: 'Desempenho excelente com tempo recorde.', created_date: '2025-02-10T16:00:00Z' }
+    ],
+    ProgressRecord: [
+      { id: 'pr-01', aircraftProfile: 'AW119', content_title: 'Módulo 1: Emergências em Pane de Rotor de Cauda', content_type: 'modulo', status: 'concluido', score: 95, time_spent_seconds: 3600, last_accessed_at: '2025-02-28', created_date: '2025-02-20T08:00:00Z' }
+    ],
+    PilotChangeRequest: [
+      { id: 'pcr-01', aircraftProfile: 'AW119', pilot_name: 'Rodrigo Sandoli', requested_by: 'Capitão Rodrigo Sandoli', status: 'approved', reviewed_by: 'Administrador Geral', created_date: '2025-02-15T11:00:00Z' }
+    ],
+    OatChangeRequest: [
+      { id: 'ocr-01', aircraftProfile: 'H125', oat_name: 'Patricia Medeiros', change_type: 'operational', status: 'pending', reviewed_by: 'Supervisão Médica', reason: 'Atualização de certificação ACLS / PHTLS.', created_date: '2025-02-22T14:00:00Z' }
+    ],
+    User: [
+      { id: 'usr-01', full_name: 'Administrador do Sistema', email: 'admin@rsandoli.aero', login: 'admin.master', role: 'admin', access_level: 'admin_geral', account_status: 'ativa', registration: 'ADM-001', unit: 'Quartel General', job_title: 'Coordenador de TI & Treinamento', last_login_at: '2025-03-03T09:40:00Z', created_date: '2025-01-01T00:00:00Z' },
+      { id: 'usr-02', full_name: 'Rodrigo Sandoli', email: 'rodrigo.sandoli@rsandoli.aero', login: 'r.sandoli', role: 'user', access_level: 'gestor_supervisor', account_status: 'ativa', registration: 'CANAC-124982', unit: 'Esquadrão Águia', job_title: 'Comandante de Aeronave', last_login_at: '2025-03-02T19:10:00Z', created_date: '2025-01-10T10:00:00Z' }
+    ],
+    UserInvite: [
+      { id: 'inv-01', full_name: 'Tenente Bruno Cavalcante', email: 'b.cavalcante@policiamilitar.sp.gov.br', access_level: 'operacional', status: 'pending', unit: 'Base Campinas', invited_by_name: 'Administrador do Sistema', created_at: '2025-02-28T14:00:00Z' }
+    ],
+    AccountStatus: [
+      { id: 'as-01', user_id: 'usr-02', status: 'ativa', set_by: 'Administrador do Sistema', set_at: '2025-01-10T10:00:00Z', reason: 'Acesso homologado após verificação da licença.', created_date: '2025-01-10T10:00:00Z' }
+    ],
+    AccessCode: [
+      { id: 'ac-code-01', user_email: 'ro*****@rsandoli.aero', purpose: 'login', channel: 'email', expires_at: '2025-03-03T10:00:00Z', used: 'true', created_at: '2025-03-03T09:40:00Z' }
+    ],
+    AccessAuditLog: [
+      { id: 'log-01', actor_name: 'Administrador do Sistema', action: 'AUTENTICACAO_SUCESSO', target_name: 'Sistema Geral', details: 'Login efetuado via credenciais e MFA', created_at: '2025-03-03T09:40:00Z' },
+      { id: 'log-02', actor_name: 'Rodrigo Sandoli', action: 'EMISSAO_CHECKLIST', target_name: 'PR-RST', details: 'Checklist pré-voo finalizado com aprovação GO', created_at: '2025-03-01T08:15:00Z' }
+    ],
+    TermsAcceptance: [
+      { id: 'trm-01', user_email: 'admin@rsandoli.aero', terms_version: 'v1.0', accepted_at: '2025-01-01', ip_address: '187.120.44.12', created_date: '2025-01-01T00:05:00Z' },
+      { id: 'trm-02', user_email: 'rodrigo.sandoli@rsandoli.aero', terms_version: 'v1.0', accepted_at: '2025-01-10', ip_address: '177.34.89.50', created_date: '2025-01-10T10:02:00Z' }
+    ],
+    ProjectMilestone: [
+      { id: 'mst-01', title: 'Integração de Telemetria de Frota AW119 & H125', description: 'Sincronização em tempo real de horímetros, limites de rotor e alertas de manutenção preventiva.', category: 'modulo', status: 'concluido', milestone_date: '2025-02-28', auto_publish: 'true', linkedin_text: 'Orgulho em anunciar a nova versão do sistema RSandoli Training Ops com suporte completo à frota AW119 e H125!', created_date: '2025-02-01T08:00:00Z' },
+      { id: 'mst-02', title: 'Módulo LMS com Vídeos e Validações ANAC', description: 'Visualizador de slides PPSX e checagem automática de vigência de licenças.', category: 'conteudo', status: 'em_andamento', milestone_date: '2025-04-15', auto_publish: 'false', created_date: '2025-02-15T09:00:00Z' }
+    ]
+  };
+
+  /**
+   * APPLICATION CONTROLLER
+   */
+  const app = {
+    currentEntity: 'Pilot',
+    isFunctionsView: false,
+    pagination: { limit: 100, skip: 0 },
+    currentSort: '-created_date',
+    searchQuery: '',
+    statusFilter: '',
+    currentData: [],
+    isLoading: false,
+
+    init() {
+      this.initUI();
+      this.renderSidebar();
+      this.bindEvents();
+      this.updateConnectionDisplay();
+      this.loadEntity('Pilot');
+    },
+
+    initUI() {
+      document.getElementById('btnPrintReport').addEventListener('click', () => {
+        window.print();
+      });
+
+      const toggleBtn = document.getElementById('btnToggleSidebar');
+      const sidebar = document.getElementById('appSidebar');
+      if (window.innerWidth <= 900) {
+        toggleBtn.style.display = 'inline-flex';
+      }
+      toggleBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('open');
+      });
+      window.addEventListener('resize', () => {
+        if (window.innerWidth <= 900) {
+          toggleBtn.style.display = 'inline-flex';
+        } else {
+          toggleBtn.style.display = 'none';
+          sidebar.classList.remove('open');
+        }
+      });
+    },
+
+    openSettingsModal() {
+      document.getElementById('settingBaseUrlInput').value = API_CONFIG.baseUrl || '/api';
+      document.getElementById('settingTokenInput').value = API_CONFIG.token || '';
+      this.openModal('modalBackendSettings');
+    },
+
+    saveSettings() {
+      let bUrl = document.getElementById('settingBaseUrlInput').value.trim();
+      if (!bUrl) bUrl = '/api';
+      // Normalize trailing slash
+      bUrl = bUrl.replace(/\/+$/, '');
+      if (!bUrl) bUrl = '/api';
+
+      const token = document.getElementById('settingTokenInput').value.trim();
+
+      API_CONFIG.baseUrl = bUrl;
+      sessionStorage.setItem(STORAGE_KEYS.baseUrl, bUrl);
+
+      API_CONFIG.token = token;
+      if (token) {
+        sessionStorage.setItem(STORAGE_KEYS.token, token);
+      } else {
+        sessionStorage.removeItem(STORAGE_KEYS.token);
+      }
+
+      this.updateConnectionDisplay();
+      this.closeModal('modalBackendSettings');
+      this.toast('Configurações do backend atualizadas!', 'success');
+      this.refreshCurrentView();
+    },
+
+    updateConnectionDisplay() {
+      const headerUrl = document.getElementById('headerBaseUrlDisplay');
+      if (headerUrl) headerUrl.textContent = API_CONFIG.baseUrl;
+
+      const tokenInd = document.getElementById('headerTokenIndicator');
+      if (tokenInd) {
+        if (API_CONFIG.token) {
+          tokenInd.className = 'badge badge-success';
+          tokenInd.textContent = 'Token Ativo';
+        } else {
+          tokenInd.className = 'badge badge-neutral';
+          tokenInd.textContent = 'Sem Token';
+        }
+      }
+
+      const dot = document.getElementById('sourceDot');
+      const label = document.getElementById('sourceLabel');
+      if (dot && label) {
+        dot.className = 'source-indicator live';
+        label.textContent = `Backend: ${API_CONFIG.baseUrl}`;
+      }
+    },
+
+    renderSidebar() {
+      const container = document.getElementById('navContainer');
+      let html = '';
+
+      NAV_GROUPS.forEach(grp => {
+        html += `<div class="nav-group">
+          <div class="nav-group-title">${grp.label}</div>`;
+
+        if (grp.isFunctions) {
+          html += `<a class="nav-item ${this.isFunctionsView ? 'active' : ''}" onclick="app.loadFunctionsView()">
+            <span>⚡ Funções de Backend</span>
+            <span class="nav-counter">${BACKEND_FUNCTIONS.length}</span>
+          </a>`;
+        } else {
+          grp.entities.forEach(entKey => {
+            const meta = ENTITIES[entKey];
+            if (!meta) return;
+            const count = (mockDatabase[entKey] || []).length;
+            const isActive = !this.isFunctionsView && this.currentEntity === entKey;
+            html += `<a class="nav-item ${isActive ? 'active' : ''}" onclick="app.loadEntity('${entKey}')">
+              <span>${meta.label}</span>
+              <span class="nav-counter" id="cnt-${entKey}">${count}</span>
+            </a>`;
+          });
+        }
+        html += `</div>`;
+      });
+
+      container.innerHTML = html;
+    },
+
+    bindEvents() {
+      // ESC closes modals
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+        }
+      });
+    },
+
+    loadEntity(entityName) {
+      this.isFunctionsView = false;
+      this.currentEntity = entityName;
+      this.pagination.skip = 0;
+      this.searchQuery = '';
+      this.statusFilter = '';
+      this.renderSidebar();
+      if (window.innerWidth <= 900) {
+        document.getElementById('appSidebar').classList.remove('open');
+      }
+      this.fetchEntityList();
+    },
+
+    loadFunctionsView() {
+      this.isFunctionsView = true;
+      this.renderSidebar();
+      if (window.innerWidth <= 900) {
+        document.getElementById('appSidebar').classList.remove('open');
+      }
+      this.renderFunctionsView();
+    },
+
+    refreshCurrentView() {
+      if (this.isFunctionsView) {
+        this.renderFunctionsView();
+      } else {
+        this.fetchEntityList();
+      }
+    },
+
+    /**
+     * API FETCH WRAPPER
+     * Consome o backend intermediário com tratamento de erros conforme requisitos:
+     * - 401 ou 403: "Token do backend inválido ou sem permissão"
+     * - 502: "Serviço de origem indisponível, tente novamente"
+     * - 400: exibir a mensagem retornada pelo backend
+     * - Header Authorization: Bearer <token> se token estiver preenchido em sessionStorage
+     * - NUNCA envia api_key do navegador
+     */
+    async apiFetch(endpoint, options = {}) {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+      };
+
+      if (API_CONFIG.token) {
+        headers['Authorization'] = `Bearer ${API_CONFIG.token}`;
+      }
+
+      const url = `${API_CONFIG.baseUrl}${endpoint}`;
+
+      try {
+        const response = await fetch(url, {
+          ...options,
+          headers
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        let data = null;
+        if (contentType.includes('application/json')) {
+          try {
+            data = await response.json();
+          } catch (e) {
+            data = null;
+          }
+        } else {
+          data = await response.text();
+        }
+
+        if (!response.ok) {
+          let errMessage = `Erro ${response.status}`;
+          if (response.status === 401 || response.status === 403) {
+            errMessage = 'Token do backend inválido ou sem permissão';
+          } else if (response.status === 502) {
+            errMessage = 'Serviço de origem indisponível, tente novamente';
+          } else if (response.status === 400) {
+            if (typeof data === 'object' && data) {
+              errMessage = data.message || data.error || JSON.stringify(data);
+            } else if (typeof data === 'string' && data.trim()) {
+              errMessage = data;
+            } else {
+              errMessage = 'Requisição inválida (400)';
+            }
+          } else if (response.status === 404) {
+            errMessage = `Endpoint não localizado no backend (${endpoint})`;
+          } else if (response.status >= 500) {
+            errMessage = `Erro no servidor intermediário (${response.status})`;
+          } else if (typeof data === 'object' && data?.message) {
+            errMessage = data.message;
+          }
+          throw new Error(errMessage);
+        }
+
+        return { ok: true, data, status: response.status };
+      } catch (err) {
+        return { ok: false, error: err.message };
+      }
+    },
+
+    /**
+     * LIST & TABLE
+     */
+    async fetchEntityList() {
+      const entity = ENTITIES[this.currentEntity];
+      if (!entity) return;
+
+      this.isLoading = true;
+      this.renderTableSkeleton();
+
+      // Route: /api/entities/{Entidade} (GET)
+      const qParam = encodeURIComponent(JSON.stringify({}));
+      const endpoint = `/entities/${this.currentEntity}?limit=${this.pagination.limit}&skip=${this.pagination.skip}&sort_by=${this.currentSort}&q=${qParam}`;
+
+      let records = [];
+      let usedMock = false;
+
+      const res = await this.apiFetch(endpoint, { method: 'GET' });
+      if (res.ok && Array.isArray(res.data)) {
+        records = res.data;
+      } else {
+        // Fallback gracefully to mock data with clear notification
+        if (res.error) {
+          this.toast(`Backend: ${res.error}. Exibindo dados locais de demonstração.`, 'info');
+        }
+        records = mockDatabase[this.currentEntity] || [];
+        usedMock = true;
+      }
+
+      this.currentData = records;
+      this.isLoading = false;
+      this.renderEntityWorkspace(usedMock);
+    },
+
+    renderTableSkeleton() {
+      const view = document.getElementById('viewContainer');
+      view.innerHTML = `
+        <div style="padding: 40px; text-align: center; color: var(--text-muted);">
+          <div style="font-size: 1.1rem; font-weight: 600;">Carregando registros...</div>
+          <div style="font-size: 0.82rem; margin-top: 6px;">Consultando backend intermediário em <code>${API_CONFIG.baseUrl}</code>...</div>
+        </div>
+      `;
+    },
+
+    renderEntityWorkspace(usedMock = false) {
+      const entity = ENTITIES[this.currentEntity];
+      const view = document.getElementById('viewContainer');
+      const isPriority = PRIORITY_ENTITIES.includes(this.currentEntity);
+
+      // Extract unique statuses for status filter
+      const allStatuses = new Set();
+      this.currentData.forEach(item => {
+        const s = item.status || item.situation || item.approval_status || item.registration_status;
+        if (s) allStatuses.add(s);
+      });
+
+      // Filter locally for search and status
+      let filtered = [...this.currentData];
+      if (this.statusFilter) {
+        filtered = filtered.filter(item => {
+          const s = item.status || item.situation || item.approval_status || item.registration_status;
+          return s === this.statusFilter;
+        });
+      }
+
+      if (this.searchQuery) {
+        const term = this.searchQuery.toLowerCase();
+        filtered = filtered.filter(item => {
+          return Object.values(item).some(val => {
+            if (val === null || val === undefined) return false;
+            return String(val).toLowerCase().includes(term);
+          });
+        });
+      }
+
+      const totalCount = filtered.length;
+      const readOnly = !!entity.readOnly;
+
+      // Stats calculation for summary cards
+      const totalAll = this.currentData.length;
+      const pendingCount = this.currentData.filter(item => {
+        const s = (item.status || item.situation || item.approval_status || item.registration_status || '').toLowerCase();
+        return ['pending', 'pending_review', 'in_review', 'near_expiry', 'training', 'in_maintenance', 'draft', 'pending_items', 'planejada'].includes(s);
+      }).length;
+      const activeCount = this.currentData.filter(item => {
+        const s = (item.status || item.situation || item.approval_status || item.registration_status || '').toLowerCase();
+        return ['active', 'approved', 'ok', 'available', 'confirmada', 'concluido', 'valid', 'ativa'].includes(s);
+      }).length;
+      const criticalCount = this.currentData.filter(item => {
+        const s = (item.status || item.situation || item.approval_status || item.registration_status || '').toLowerCase();
+        return ['expired', 'rejected', 'no_go', 'grounded', 'bloqueada', 'desativada', 'cancelled', 'suspended'].includes(s);
+      }).length;
+
+      let html = '';
+
+      // View Header
+      html += `
+        <div class="view-header">
+          <div class="view-title">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <h1>${entity.label}</h1>
+              ${isPriority ? '<span class="badge badge-info">Prioritário</span>' : ''}
+              <span class="badge badge-neutral" style="font-size:0.75rem;">${entity.name}</span>
+              ${usedMock ? '<span class="badge badge-warning">Simulação Local</span>' : '<span class="badge badge-success">Backend Ativo</span>'}
+            </div>
+            <p>${entity.description}</p>
+          </div>
+          <div class="view-actions">
+            ${!readOnly ? `
+              <button class="btn btn-primary" onclick="app.openCreateModal()" title="Criar novo registro">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                Novo Registro
+              </button>
+              <button class="btn btn-outline" onclick="app.openBulkModal()" title="Operações em lote">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                Lote / Bulk
+              </button>
+            ` : '<span class="badge badge-neutral">Auditoria (Leitura)</span>'}
+          </div>
+        </div>
+      `;
+
+      // Enhanced Summary Cards for Priority Screens (and all operational screens)
+      if (isPriority) {
+        html += `
+          <div class="priority-summary-grid">
+            <div class="priority-stat-card card-primary">
+              <div class="priority-stat-title">Total de Registros</div>
+              <div class="priority-stat-value">${totalAll}</div>
+              <div class="priority-stat-desc">Base operacional cadastrada</div>
+            </div>
+            <div class="priority-stat-card card-success">
+              <div class="priority-stat-title">Ativos / Concluídos</div>
+              <div class="priority-stat-value">${activeCount}</div>
+              <div class="priority-stat-desc">Situação operacional regular</div>
+            </div>
+            <div class="priority-stat-card card-warning">
+              <div class="priority-stat-title">Pendências / Em Análise</div>
+              <div class="priority-stat-value">${pendingCount}</div>
+              <div class="priority-stat-desc">Exigem atenção ou aprovação</div>
+            </div>
+            <div class="priority-stat-card ${criticalCount > 0 ? 'card-danger' : ''}">
+              <div class="priority-stat-title">Impedimentos / Críticos</div>
+              <div class="priority-stat-value">${criticalCount}</div>
+              <div class="priority-stat-desc">Vencidos, suspensos ou no-go</div>
+            </div>
+          </div>
+        `;
+      }
+
+      // Filter & Search Toolbar
+      html += `
+        <div class="table-toolbar">
+          <div class="filter-left">
+            <input type="text" class="search-input" id="searchFilterInput" placeholder="Buscar por texto nas colunas..." value="${this.searchQuery}" oninput="app.handleSearchInput(this.value)">
+            
+            <select class="filter-select" id="statusFilterSelect" onchange="app.handleStatusFilterChange(this.value)">
+              <option value="">Todos os Status</option>
+              ${Array.from(allStatuses).sort().map(st => `
+                <option value="${st}" ${this.statusFilter === st ? 'selected' : ''}>Status: ${st}</option>
+              `).join('')}
+            </select>
+
+            <select class="filter-select" onchange="app.handleSortChange(this.value)">
+              <option value="-created_date" ${this.currentSort === '-created_date' ? 'selected' : ''}>Mais Recentes</option>
+              <option value="created_date" ${this.currentSort === 'created_date' ? 'selected' : ''}>Mais Antigos</option>
+              <option value="id" ${this.currentSort === 'id' ? 'selected' : ''}>ID Ascendente</option>
+            </select>
+          </div>
+          <div class="filter-right">
+            <span style="font-size:0.8rem; color:var(--text-muted);">${totalCount} de ${totalAll} registro(s)</span>
+            ${!readOnly ? `
+              <button class="btn btn-outline btn-sm" onclick="app.openCreateModal()" title="Novo Registro">
+                + Novo
+              </button>
+            ` : ''}
+            <button class="btn btn-outline btn-sm" onclick="app.fetchEntityList()" title="Recarregar dados">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              Atualizar
+            </button>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-card">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 80px;">ID</th>
+                  ${entity.primaryCols.map(c => `<th>${this.formatColumnHeader(c)}</th>`).join('')}
+                  <th style="text-align: right; width: 140px;">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+      `;
+
+      if (filtered.length === 0) {
+        html += `
+          <tr>
+            <td colspan="${entity.primaryCols.length + 2}" style="text-align:center; padding: 36px; color: var(--text-muted);">
+              Nenhum registro encontrado nesta consulta.
+            </td>
+          </tr>
+        `;
+      } else {
+        filtered.forEach(row => {
+          const isDeleted = !!row.deleted;
+          html += `
+            <tr class="${isDeleted ? 'is-deleted' : ''}">
+              <td style="font-family:monospace; font-weight:600; font-size:0.78rem;">
+                <span title="${row.id || ''}">${(row.id || 'N/A').slice(0, 10)}</span>
+              </td>
+              ${entity.primaryCols.map(col => `<td>${this.renderTableCell(row, col)}</td>`).join('')}
+              <td style="text-align: right; white-space: nowrap;">
+                <button class="btn btn-outline btn-sm" onclick="app.openDetailModal('${row.id}')" title="Visualizar detalhes">
+                  Ver
+                </button>
+                ${!readOnly ? `
+                  ${!isDeleted ? `
+                    <button class="btn btn-outline btn-sm" onclick="app.openEditModal('${row.id}')" title="Editar registro">
+                      Editar
+                    </button>
+                    <button class="btn btn-outline btn-sm" style="color:#b91c1c;" onclick="app.handleSoftDelete('${row.id}')" title="Excluir logicamente">
+                      Excluir
+                    </button>
+                  ` : `
+                    <button class="btn btn-outline btn-sm" style="color:#15803d;" onclick="app.handleRestore('${row.id}')" title="Restaurar registro excluído">
+                      Restaurar
+                    </button>
+                  `}
+                ` : ''}
+              </td>
+            </tr>
+          `;
+        });
+      }
+
+      html += `
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Bar -->
+          <div class="pagination-bar">
+            <div>
+              Exibindo registros ${this.pagination.skip + 1} até ${this.pagination.skip + filtered.length}
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-outline btn-sm" ${this.pagination.skip <= 0 ? 'disabled' : ''} onclick="app.paginate(-1)">
+                Anterior
+              </button>
+              <button class="btn btn-outline btn-sm" ${filtered.length < this.pagination.limit ? 'disabled' : ''} onclick="app.paginate(1)">
+                Próxima
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      view.innerHTML = html;
+    },
+
+    formatColumnHeader(key) {
+      const fieldDef = (ENTITIES[this.currentEntity]?.fields || []).find(f => f.key === key);
+      if (fieldDef) return fieldDef.label;
+      return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    },
+
+    renderTableCell(row, key) {
+      const val = row[key];
+      if (val === undefined || val === null || val === '') {
+        return '<span style="color:var(--text-muted);">-</span>';
+      }
+
+      // Status badges
+      if (key === 'status' || key === 'situation' || key === 'approval_status' || key === 'registration_status' || key === 'account_status') {
+        return this.renderStatusBadge(String(val));
+      }
+
+      // Aircraft profile badge
+      if (key === 'aircraftProfile') {
+        const bg = val === 'AW119' ? 'badge-info' : val === 'H125' ? 'badge-warning' : 'badge-neutral';
+        return `<span class="badge ${bg}">${val}</span>`;
+      }
+
+      // Objects or JSON
+      if (typeof val === 'object') {
+        return `<span style="font-family:monospace; font-size:0.75rem; color:var(--accent-text);">[JSON]</span>`;
+      }
+
+      // Document URIs
+      if (key.includes('uri') || key.includes('url')) {
+        return `<span style="font-family:monospace; font-size:0.75rem;" title="${val}">Doc Anexado</span>`;
+      }
+
+      return String(val);
+    },
+
+    renderStatusBadge(val) {
+      val = val.toLowerCase();
+      let colorClass = 'badge-neutral';
+      if (['active', 'approved', 'ok', 'concluido', 'valid', 'ativa', 'available'].includes(val)) {
+        colorClass = 'badge-success';
+      } else if (['pending', 'pending_review', 'in_review', 'planejada', 'em_andamento', 'near_expiry', 'convite_pendente'].includes(val)) {
+        colorClass = 'badge-warning';
+      } else if (['expired', 'rejected', 'no_go', 'grounded', 'bloqueada', 'desativada', 'cancelled', 'suspended'].includes(val)) {
+        colorClass = 'badge-danger';
+      } else if (['in_maintenance', 'revisao_recomendada', 'training'].includes(val)) {
+        colorClass = 'badge-info';
+      }
+      return `<span class="badge ${colorClass}">${val}</span>`;
+    },
+
+    handleSearchInput(val) {
+      this.searchQuery = val;
+      this.renderEntityWorkspace();
+    },
+
+    handleStatusFilterChange(val) {
+      this.statusFilter = val;
+      this.renderEntityWorkspace();
+    },
+
+    handleSortChange(val) {
+      this.currentSort = val;
+      this.fetchEntityList();
+    },
+
+    paginate(direction) {
+      const step = this.pagination.limit;
+      if (direction === -1 && this.pagination.skip >= step) {
+        this.pagination.skip -= step;
+      } else if (direction === 1) {
+        this.pagination.skip += step;
+      }
+      this.fetchEntityList();
+    },
+
+    /**
+     * CREATE & EDIT MODAL ENGINE
+     */
+    openCreateModal() {
+      const entity = ENTITIES[this.currentEntity];
+      if (!entity) return;
+
+      document.getElementById('formModalTitle').textContent = `Novo Registro: ${entity.label}`;
+      document.getElementById('formEntityId').value = '';
+      this.generateFormFields(entity, {});
+      this.openModal('modalEntityForm');
+    },
+
+    openEditModal(id) {
+      const entity = ENTITIES[this.currentEntity];
+      if (!entity) return;
+
+      const record = this.currentData.find(r => r.id === id);
+      if (!record) {
+        this.toast('Registro não encontrado na memória.', 'error');
+        return;
+      }
+
+      document.getElementById('formModalTitle').textContent = `Editar Registro: ${entity.label} (${id})`;
+      document.getElementById('formEntityId').value = id;
+      this.generateFormFields(entity, record);
+      this.openModal('modalEntityForm');
+    },
+
+    generateFormFields(entity, currentValues) {
+      const container = document.getElementById('formFieldsContainer');
+      let html = '';
+
+      entity.fields.forEach(fld => {
+        const val = currentValues[fld.key] !== undefined ? currentValues[fld.key] : (fld.default || '');
+        const isRequired = !!fld.required;
+        const colClass = (fld.type === 'textarea' || fld.type === 'json') ? 'form-group col-span-2' : 'form-group';
+
+        html += `<div class="${colClass}">
+          <label class="form-label ${isRequired ? 'required' : ''}">${fld.label}</label>`;
+
+        if (fld.type === 'select') {
+          html += `<select name="${fld.key}" class="form-control" ${isRequired ? 'required' : ''}>`;
+          if (!isRequired) html += `<option value="">-- Selecione --</option>`;
+          (fld.options || []).forEach(opt => {
+            const selected = String(opt) === String(val) ? 'selected' : '';
+            html += `<option value="${opt}" ${selected}>${opt}</option>`;
+          });
+          html += `</select>`;
+        } else if (fld.type === 'textarea') {
+          html += `<textarea name="${fld.key}" class="form-control" ${isRequired ? 'required' : ''}>${val || ''}</textarea>`;
+        } else if (fld.type === 'json') {
+          const jsonStr = (typeof val === 'object' && val !== null) ? JSON.stringify(val, null, 2) : (val || '');
+          html += `
+            <textarea name="${fld.key}" class="form-control json-field" placeholder='{"chave": "valor"}' ${isRequired ? 'required' : ''}>${jsonStr}</textarea>
+            <span style="font-size:0.72rem; color:var(--text-muted);">Formato JSON válido.</span>
+          `;
+        } else if (fld.type === 'date') {
+          let dateVal = val;
+          if (dateVal && dateVal.includes('T')) dateVal = dateVal.split('T')[0];
+          html += `<input type="date" name="${fld.key}" class="form-control" value="${dateVal || ''}" ${isRequired ? 'required' : ''}>`;
+        } else if (fld.type === 'number') {
+          html += `<input type="number" name="${fld.key}" class="form-control" value="${val || ''}" ${isRequired ? 'required' : ''}>`;
+        } else {
+          html += `<input type="text" name="${fld.key}" class="form-control" value="${val || ''}" ${isRequired ? 'required' : ''}>`;
+        }
+
+        // URI notice
+        if (fld.key.includes('uri') || fld.key.includes('url')) {
+          html += `<div class="doc-warning">Aviso de Segurança: URLs de documentos são privadas e nunca devem ser expostas em links públicos sem autenticação prévia.</div>`;
+        }
+
+        html += `</div>`;
+      });
+
+      container.innerHTML = html;
+    },
+
+    async handleFormSubmit(event) {
+      event.preventDefault();
+      const form = event.target;
+      const id = document.getElementById('formEntityId').value;
+      const isEdit = !!id;
+
+      const formData = new FormData(form);
+      const payload = {};
+      let hasError = false;
+
+      const entity = ENTITIES[this.currentEntity];
+
+      for (let fld of entity.fields) {
+        let val = formData.get(fld.key);
+        if (fld.type === 'number') {
+          val = val === '' ? null : Number(val);
+        } else if (fld.type === 'json') {
+          if (val && val.trim() !== '') {
+            try {
+              val = JSON.parse(val);
+            } catch (err) {
+              this.toast(`Erro no campo JSON "${fld.label}": formato inválido.`, 'error');
+              hasError = true;
+              break;
+            }
+          } else {
+            val = null;
+          }
+        }
+        if (val !== null && val !== undefined) {
+          payload[fld.key] = val;
+        }
+      }
+
+      if (hasError) return;
+
+      // Execute API call
+      let endpoint = `/entities/${this.currentEntity}`;
+      let method = 'POST';
+
+      if (isEdit) {
+        endpoint = `/entities/${this.currentEntity}/${id}`;
+        method = 'PUT';
+      }
+
+      const submitBtn = document.getElementById('btnSubmitForm');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Enviando...';
+
+      // Executa chamada no backend intermediário
+      const res = await this.apiFetch(endpoint, {
+        method,
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        this.toast(`Registro ${isEdit ? 'atualizado' : 'criado'} com sucesso via backend!`, 'success');
+      } else {
+        this.toast(`Backend: ${res.error}. Atualizando na memória local de simulação.`, 'info');
+      }
+
+      // Also update local mock database
+      if (!mockDatabase[this.currentEntity]) mockDatabase[this.currentEntity] = [];
+      if (isEdit) {
+        const idx = mockDatabase[this.currentEntity].findIndex(r => r.id === id);
+        if (idx !== -1) {
+          mockDatabase[this.currentEntity][idx] = {
+            ...mockDatabase[this.currentEntity][idx],
+            ...payload,
+            updated_date: new Date().toISOString()
+          };
+        }
+      } else {
+        const newRecord = {
+          id: `${this.currentEntity.toLowerCase().slice(0, 3)}-${Date.now()}`,
+          ...payload,
+          created_date: new Date().toISOString()
+        };
+        mockDatabase[this.currentEntity].unshift(newRecord);
+      }
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Salvar Alterações';
+      this.closeModal('modalEntityForm');
+      this.fetchEntityList();
+      this.renderSidebar();
+    },
+
+    /**
+     * DETAIL VIEW: /api/entities/{Entidade}/{id} (GET)
+     */
+    async openDetailModal(id) {
+      const entity = ENTITIES[this.currentEntity];
+      let record = this.currentData.find(r => r.id === id);
+
+      const res = await this.apiFetch(`/entities/${this.currentEntity}/${id}`, { method: 'GET' });
+      if (res.ok && res.data) {
+        record = res.data;
+      }
+
+      if (!record) {
+        this.toast('Detalhes do registro não puderam ser carregados.', 'error');
+        return;
+      }
+
+      document.getElementById('detailModalTitle').textContent = `${entity.label} - ID: ${record.id || id}`;
+      const container = document.getElementById('detailGridContainer');
+
+      // Common audit fields
+      const allKeys = Object.keys(record);
+
+      let html = '';
+      allKeys.forEach(k => {
+        const val = record[k];
+        let displayVal = val;
+        if (typeof val === 'object' && val !== null) {
+          displayVal = `<pre>${JSON.stringify(val, null, 2)}</pre>`;
+        } else if (val === null || val === undefined) {
+          displayVal = '<span style="color:var(--text-muted);">-</span>';
+        } else if (k.includes('uri') || k.includes('url')) {
+          displayVal = `<code>${val}</code><div class="doc-warning">Documento confidencial da aeronave. Não expor link sem validação.</div>`;
+        }
+
+        html += `
+          <div class="detail-item">
+            <div class="detail-key">${k}</div>
+            <div class="detail-val">${displayVal}</div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      this.openModal('modalEntityDetail');
+    },
+
+    /**
+     * SOFT DELETE & RESTORE
+     * Rotas:
+     * - DELETE /api/entities/{Entidade}/{id}
+     * - PUT /api/entities/{Entidade}/{id}/restore
+     */
+    async handleSoftDelete(id) {
+      const confirmDelete = confirm(`Confirma a exclusão do registro ID ${id}?`);
+      if (!confirmDelete) return;
+
+      const res = await this.apiFetch(`/entities/${this.currentEntity}/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        this.toast(`Backend: ${res.error}. Exclusão aplicada na memória local.`, 'info');
+      }
+
+      // Mark locally
+      const row = this.currentData.find(r => r.id === id);
+      if (row) {
+        row.deleted = true;
+        row.updated_date = new Date().toISOString();
+      }
+      this.toast(`Registro ${id} excluído com sucesso.`, 'info');
+      this.renderEntityWorkspace();
+    },
+
+    async handleRestore(id) {
+      const res = await this.apiFetch(`/entities/${this.currentEntity}/${id}/restore`, { method: 'PUT' });
+      if (!res.ok) {
+        this.toast(`Backend: ${res.error}. Restauração aplicada na memória local.`, 'info');
+      }
+
+      const row = this.currentData.find(r => r.id === id);
+      if (row) {
+        delete row.deleted;
+        row.updated_date = new Date().toISOString();
+      }
+      this.toast(`Registro ${id} restaurado com sucesso!`, 'success');
+      this.renderEntityWorkspace();
+    },
+
+    /**
+     * BULK OPERATIONS ENGINE
+     */
+    openBulkModal() {
+      const entity = ENTITIES[this.currentEntity];
+      document.getElementById('bulkModalTitle').textContent = `Operações em Lote - ${entity.label}`;
+      document.getElementById('bulkActionType').value = 'bulk_create';
+      this.renderBulkEditor('bulk_create');
+      this.openModal('modalBulkOps');
+    },
+
+    renderBulkEditor(actionType) {
+      const payloadLabel = document.getElementById('bulkPayloadLabel');
+      const payloadInput = document.getElementById('bulkPayloadInput');
+      const warningBox = document.getElementById('bulkWarningBox');
+      const deleteConfirmGroup = document.getElementById('bulkDeleteConfirmGroup');
+      const deleteExpected = document.getElementById('bulkConfirmEntityExpected');
+
+      warningBox.style.display = 'none';
+      deleteConfirmGroup.style.display = 'none';
+      document.getElementById('bulkConfirmEntityInput').value = '';
+
+      if (actionType === 'bulk_create') {
+        payloadLabel.textContent = 'Array JSON de Novos Registros (POST /bulk)';
+        payloadInput.value = JSON.stringify([
+          { aircraftProfile: 'AW119', notes: 'Item 1 em lote' },
+          { aircraftProfile: 'H125', notes: 'Item 2 em lote' }
+        ], null, 2);
+      } else if (actionType === 'bulk_update') {
+        payloadLabel.textContent = 'Array JSON com ID e Campos a Atualizar (PUT /bulk)';
+        payloadInput.value = JSON.stringify([
+          { id: 'plt-01', notes: 'Atualização de auditoria' }
+        ], null, 2);
+      } else if (actionType === 'update_many') {
+        payloadLabel.textContent = 'Objeto { query, data } com operadores $set/$inc (PATCH /update-many)';
+        payloadInput.value = JSON.stringify({
+          query: { aircraftProfile: 'AW119' },
+          data: {
+            $set: { status: 'active' }
+          }
+        }, null, 2);
+      } else if (actionType === 'bulk_delete') {
+        payloadLabel.textContent = 'Filtro JSON de Exclusão (DELETE /entities/{Entidade})';
+        payloadInput.value = JSON.stringify({ status: 'archived' }, null, 2);
+        warningBox.style.display = 'block';
+        warningBox.className = 'doc-warning';
+        warningBox.innerHTML = '<strong>Atenção de Segurança:</strong> Filtro obrigatório não vazio. Exige digitar o nome da entidade para autorizar o header <code>X-Confirm-Delete</code>.';
+        deleteConfirmGroup.style.display = 'block';
+        deleteExpected.textContent = `"${this.currentEntity}"`;
+      }
+    },
+
+    /**
+     * BULK ACTIONS EXECUTION
+     * Rotas:
+     * - POST /api/entities/{Entidade}/bulk
+     * - PUT /api/entities/{Entidade}/bulk
+     * - PATCH /api/entities/{Entidade}/update-many
+     * - DELETE /api/entities/{Entidade} (com body de filtro e header X-Confirm-Delete)
+     */
+    async executeBulkAction() {
+      const actionType = document.getElementById('bulkActionType').value;
+      const rawText = document.getElementById('bulkPayloadInput').value.trim();
+
+      let parsed = null;
+      try {
+        parsed = JSON.parse(rawText);
+      } catch (err) {
+        this.toast('JSON inválido. Corrija a sintaxe antes de prosseguir.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btnExecuteBulk');
+      btn.disabled = true;
+      btn.textContent = 'Processando...';
+
+      let endpoint = '';
+      let method = 'POST';
+      const customHeaders = {};
+
+      if (actionType === 'bulk_create') {
+        endpoint = `/entities/${this.currentEntity}/bulk`;
+        method = 'POST';
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          this.toast('Para criar em lote, o corpo deve ser um Array JSON não vazio [ ... ].', 'error');
+          btn.disabled = false;
+          btn.textContent = 'Executar Operação';
+          return;
+        }
+      } else if (actionType === 'bulk_update') {
+        endpoint = `/entities/${this.currentEntity}/bulk`;
+        method = 'PUT';
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          this.toast('Para atualizar em lote, o corpo deve ser um Array JSON de itens com id.', 'error');
+          btn.disabled = false;
+          btn.textContent = 'Executar Operação';
+          return;
+        }
+      } else if (actionType === 'update_many') {
+        endpoint = `/entities/${this.currentEntity}/update-many`;
+        method = 'PATCH';
+        if (!parsed.query || !parsed.data) {
+          this.toast('O formato para update-many exige { query, data } com operadores.', 'error');
+          btn.disabled = false;
+          btn.textContent = 'Executar Operação';
+          return;
+        }
+      } else if (actionType === 'bulk_delete') {
+        endpoint = `/entities/${this.currentEntity}`;
+        method = 'DELETE';
+
+        // Requirement 6: Exigir filtro não vazio
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || Object.keys(parsed).length === 0) {
+          alert('SEGURANÇA BLOQUEADA: Filtro não pode ser vazio para exclusão em lote.');
+          btn.disabled = false;
+          btn.textContent = 'Executar Operação';
+          return;
+        }
+
+        // Requirement 6: Exigir que o usuário digite o nome da entidade para confirmar
+        const confirmInputVal = document.getElementById('bulkConfirmEntityInput').value.trim();
+        if (confirmInputVal !== this.currentEntity) {
+          alert(`Confirmação obrigatória: digite exatamente "${this.currentEntity}" no campo de confirmação.`);
+          btn.disabled = false;
+          btn.textContent = 'Executar Operação';
+          return;
+        }
+
+        // Requirement 6: Enviar o header X-Confirm-Delete com o nome da entidade
+        customHeaders['X-Confirm-Delete'] = this.currentEntity;
+      }
+
+      const res = await this.apiFetch(endpoint, {
+        method,
+        headers: customHeaders,
+        body: JSON.stringify(parsed)
+      });
+
+      if (res.ok) {
+        this.toast('Operação em lote executada com sucesso via backend!', 'success');
+      } else {
+        this.toast(`Backend: ${res.error}. Simulação aplicada no protótipo.`, 'info');
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Executar Operação';
+      this.closeModal('modalBulkOps');
+      this.fetchEntityList();
+    },
+
+    /**
+     * BACKEND FUNCTIONS VIEW (/functions/{nome})
+     */
+    renderFunctionsView() {
+      const view = document.getElementById('viewContainer');
+
+      let html = `
+        <div class="view-header">
+          <div class="view-title">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <h1>Painel de Funções de Backend</h1>
+              <span class="badge badge-info">POST /functions/{nome}</span>
+            </div>
+            <p>Execução de rotas RPC assíncronas sem exigência de api_key. Envie o payload JSON livre e visualize a resposta HTTP 200/404.</p>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: 16px;">
+      `;
+
+      BACKEND_FUNCTIONS.forEach(fn => {
+        const sampleJson = JSON.stringify(fn.sample, null, 2);
+        html += `
+          <div class="function-card" id="fn-card-${fn.name}">
+            <div class="function-header">
+              <span class="function-name">${fn.name}</span>
+              <button class="btn btn-primary btn-sm" onclick="app.executeBackendFunction('${fn.name}')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                Executar
+              </button>
+            </div>
+            <p style="font-size:0.8125rem; color:var(--text-muted); margin:0 0 10px 0;">${fn.desc}</p>
+            <div style="font-size:0.75rem; font-weight:600; margin-bottom:4px; color:var(--text-muted);">Payload (JSON livre):</div>
+            <textarea class="function-body-editor" id="fn-input-${fn.name}">${sampleJson}</textarea>
+            <div class="function-response" id="fn-res-${fn.name}" style="display:none;"></div>
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+      view.innerHTML = html;
+    },
+
+    /**
+     * BACKEND FUNCTION CALL: POST /api/functions/{nome}
+     */
+    async executeBackendFunction(fnName) {
+      const inputEl = document.getElementById(`fn-input-${fnName}`);
+      const resEl = document.getElementById(`fn-res-${fnName}`);
+      const rawBody = inputEl.value.trim();
+
+      let parsed = null;
+      if (rawBody) {
+        try {
+          parsed = JSON.parse(rawBody);
+        } catch (e) {
+          this.toast('Payload JSON inválido. Verifique vírgulas e aspas.', 'error');
+          return;
+        }
+      }
+
+      resEl.style.display = 'block';
+      resEl.textContent = 'Enviando chamada ao backend intermediário...';
+
+      const res = await this.apiFetch(`/functions/${fnName}`, {
+        method: 'POST',
+        body: parsed ? JSON.stringify(parsed) : undefined
+      });
+
+      if (res.ok) {
+        const formatted = typeof res.data === 'object' ? JSON.stringify(res.data, null, 2) : res.data;
+        resEl.textContent = `Status: ${res.status} OK\n${formatted}`;
+        this.toast(`Função ${fnName} executada com sucesso via backend!`, 'success');
+      } else {
+        // Fallback simulation preview
+        const mockResponse = {
+          success: true,
+          function: fnName,
+          backend_base: API_CONFIG.baseUrl,
+          execution_time_ms: 38,
+          timestamp: new Date().toISOString(),
+          note: res.error,
+          resultado: `Ação processada com sucesso no subsistema de treinamento (${fnName}).`
+        };
+        resEl.textContent = `Status: Resposta do Backend / Simulação\n${JSON.stringify(mockResponse, null, 2)}`;
+        this.toast(`Função ${fnName}: ${res.error}. Resposta simulada.`, 'info');
+      }
+    },
+
+    /**
+     * MODAL HELPERS
+     */
+    openModal(modalId) {
+      const el = document.getElementById(modalId);
+      if (el) el.classList.add('active');
+    },
+
+    closeModal(modalId) {
+      const el = document.getElementById(modalId);
+      if (el) el.classList.remove('active');
+    },
+
+    /**
+     * TOAST SYSTEM
+     */
+    toast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const el = document.createElement('div');
+      el.className = `toast toast-${type}`;
+      el.textContent = message;
+
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(8px)';
+        el.style.transition = 'all 0.3s ease';
+        setTimeout(() => el.remove(), 300);
+      }, 4200);
+    }
+  };
+
+  // Launch on DOM ready
+  document.addEventListener('DOMContentLoaded', () => {
+    app.init();
+  });
+  </script>
+<script>
+/* Skip artifact shell — fixed helpers served beside every artifact. */
+(function () {
+  "use strict";
+
+  var fmt = {
+    num: function (v, opts) { return new Intl.NumberFormat("pt-BR", opts || {}).format(v); },
+    brl: function (v) { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v); },
+    pct: function (v) { return new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 }).format(v); }
+  };
+
+  // axisFmt keeps axis tick labels short (compact notation) so long values
+  // (e.g. full BRL amounts) never clip against the plot edge.
+  function axisFmt(v) {
+    return fmt.num(v, { notation: "compact", maximumFractionDigits: 1 });
+  }
+
+  // format accepts a function OR one of the fmt names ("num" | "brl" | "pct").
+  function coerceFormat(spec) {
+    if (typeof spec === "function") return spec;
+    if (typeof spec === "string" && fmt[spec]) return fmt[spec];
+    return function (v) { return fmt.num(v); };
+  }
+
+  function accent() {
+    return getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#2563eb";
+  }
+  function mutedColor() {
+    return getComputedStyle(document.documentElement).getPropertyValue("--text-muted").trim() || "#5b6472";
+  }
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+  function frame(el, w, h) {
+    var svg = svgEl("svg", { viewBox: "0 0 " + w + " " + h, role: "img" });
+    el.innerHTML = "";
+    el.appendChild(svg);
+    return svg;
+  }
+
+  // maxOf guards the axis scale: empty values would give -Infinity (truthy,
+  // so "|| 1" can't catch it) and a non-positive max would flip the chart.
+  function maxOf(values) {
+    var m = values.length ? Math.max.apply(null, values) : 0;
+    return m > 0 ? m : 1;
+  }
+
+  // bar(el, {labels:[], values:[], color?, format?}) — vertical bar chart.
+  function bar(el, cfg) {
+    var W = 640, H = 280, padL = 46, padB = 30, padT = 12;
+    var svg = frame(el, W, H);
+    var max = maxOf(cfg.values);
+    var n = cfg.values.length;
+    var plotW = W - padL - 12, plotH = H - padT - padB;
+    var step = plotW / n, bw = Math.min(step * 0.62, 64);
+    var color = cfg.color || accent();
+    var f = coerceFormat(cfg.format);
+    for (var g = 0; g <= 4; g++) {
+      var gy = padT + plotH - (plotH * g) / 4;
+      svg.appendChild(svgEl("line", { x1: padL, y1: gy, x2: W - 12, y2: gy, stroke: "currentColor", "stroke-opacity": 0.08 }));
+      var lbl = svgEl("text", { x: padL - 8, y: gy + 4, "text-anchor": "end", "font-size": 10, fill: mutedColor() });
+      lbl.textContent = axisFmt((max * g) / 4);
+      svg.appendChild(lbl);
+    }
+    cfg.values.forEach(function (v, i) {
+      var bh = Math.max(0, (v / max) * plotH);
+      var x = padL + i * step + (step - bw) / 2;
+      var y = padT + plotH - bh;
+      var r = svgEl("rect", { x: x, y: y, width: bw, height: bh, rx: 4, fill: color });
+      var t = svgEl("title", {});
+      t.textContent = cfg.labels[i] + ": " + f(v);
+      r.appendChild(t);
+      svg.appendChild(r);
+      var tx = svgEl("text", { x: x + bw / 2, y: H - 10, "text-anchor": "middle", "font-size": 11, fill: mutedColor() });
+      tx.textContent = cfg.labels[i];
+      svg.appendChild(tx);
+    });
+  }
+
+  // line(el, {labels:[], values:[], color?, format?}) — single-series line.
+  function line(el, cfg) {
+    var W = 640, H = 280, padL = 46, padB = 30, padT = 12;
+    var svg = frame(el, W, H);
+    var max = maxOf(cfg.values);
+    var n = cfg.values.length;
+    var plotW = W - padL - 16, plotH = H - padT - padB;
+    var color = cfg.color || accent();
+    var f = coerceFormat(cfg.format);
+    for (var g = 0; g <= 4; g++) {
+      var gy = padT + plotH - (plotH * g) / 4;
+      svg.appendChild(svgEl("line", { x1: padL, y1: gy, x2: W - 16, y2: gy, stroke: "currentColor", "stroke-opacity": 0.08 }));
+      var lbl = svgEl("text", { x: padL - 8, y: gy + 4, "text-anchor": "end", "font-size": 10, fill: mutedColor() });
+      lbl.textContent = axisFmt((max * g) / 4);
+      svg.appendChild(lbl);
+    }
+    var pts = cfg.values.map(function (v, i) {
+      var x = padL + (n === 1 ? plotW / 2 : (plotW * i) / (n - 1));
+      var y = padT + plotH - (v / max) * plotH;
+      return [x, y];
+    });
+    var d = pts.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
+    svg.appendChild(svgEl("path", { d: d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round" }));
+    pts.forEach(function (p, i) {
+      var c = svgEl("circle", { cx: p[0], cy: p[1], r: 3.5, fill: color });
+      var t = svgEl("title", {});
+      t.textContent = cfg.labels[i] + ": " + f(cfg.values[i]);
+      c.appendChild(t);
+      svg.appendChild(c);
+      var tx = svgEl("text", { x: p[0], y: H - 10, "text-anchor": "middle", "font-size": 11, fill: mutedColor() });
+      tx.textContent = cfg.labels[i];
+      svg.appendChild(tx);
+    });
+  }
+
+  // donut(el, {labels:[], values:[], colors?}) — donut with center total.
+  function donut(el, cfg) {
+    var W = 320, H = 280, cx = W / 2, cy = H / 2, R = 92, r = 58;
+    var svg = frame(el, W, H);
+    var total = cfg.values.reduce(function (a, b) { return a + b; }, 0) || 1;
+    var palette = cfg.colors || [accent(), "#1baf7a", "#eda100", "#e34948", "#4a3aa7", "#e87ba4"];
+    var a0 = -Math.PI / 2;
+    cfg.values.forEach(function (v, i) {
+      var a1 = a0 + (v / total) * Math.PI * 2;
+      var large = a1 - a0 > Math.PI ? 1 : 0;
+      var p = ["M", cx + R * Math.cos(a0), cy + R * Math.sin(a0),
+        "A", R, R, 0, large, 1, cx + R * Math.cos(a1), cy + R * Math.sin(a1),
+        "L", cx + r * Math.cos(a1), cy + r * Math.sin(a1),
+        "A", r, r, 0, large, 0, cx + r * Math.cos(a0), cy + r * Math.sin(a0), "Z"].join(" ");
+      var path = svgEl("path", { d: p, fill: palette[i % palette.length] });
+      var t = svgEl("title", {});
+      t.textContent = cfg.labels[i] + ": " + fmt.num(v) + " (" + fmt.pct(v / total) + ")";
+      path.appendChild(t);
+      svg.appendChild(path);
+      a0 = a1;
+    });
+    var center = svgEl("text", { x: cx, y: cy + 5, "text-anchor": "middle", "font-size": 20, "font-weight": 650, fill: "currentColor" });
+    center.textContent = fmt.num(total);
+    svg.appendChild(center);
+  }
+
+  window.skipShell = { fmt: fmt };
+  window.skipChart = { bar: bar, line: line, donut: donut };
+})();
+
+</script>
+</body>
+</html>
